@@ -1,0 +1,108 @@
+{
+    "app": {
+        "title": "LLM Chat",
+        "subtitle": "Vision-based GUI Interaction Assistant"
+    },
+    "menu": {
+        "file": "File",
+        "exit": "Exit",
+        "language": "Language",
+        "help": "Help",
+        "about": "About"
+    },
+    "navigation": {
+        "back": "Back",
+        "next": "Next"
+    },
+    "progress": {
+        "step_connection": "Connection",
+        "step_window": "Window",
+        "step_area": "Area",
+        "step_chat": "Chat"
+    },
+    "connection": {
+        "title": "LLM Connection",
+        "subtitle": "Connect to your LLM server (Ollama, OpenAI, or any compatible API).",
+        "url": "URL:",
+        "model": "Model:",
+        "api_key": "API Key:",
+        "api_key_hint": "Optional for local Ollama",
+        "connect": "Connect",
+        "disconnect": "Disconnect",
+        "status": {
+            "disconnected": "Not connected",
+            "connecting": "Connecting...",
+            "connected": "Connected - {count} models available",
+            "failed": "Connection failed - Check if server is running",
+            "no_models": "Connected but no models - Please pull a model first"
+        }
+    },
+    "window": {
+        "title": "Select Target Window",
+        "subtitle": "Choose the chat window you want to automate.",
+        "refresh": "Refresh",
+        "filter": "Filter...",
+        "selected": "Selected: {name}",
+        "none_selected": "Double-click to select a window",
+        "chat_apps_only": "Chat apps only"
+    },
+    "area": {
+        "title": "Area Setup",
+        "subtitle": "Capture the target window and detect chat areas, or manually select them.",
+        "capture": "Auto Detect",
+        "select_chat": "Select Chat Area",
+        "select_input": "Select Input Area",
+        "select_send": "Mark Send Button",
+        "clear": "Clear",
+        "preview": "Screenshot Preview",
+        "info": "Detection info will appear here",
+        "detection": {
+            "method": "Detection: {method} ({confidence})",
+            "ocr": "OCR",
+            "heuristic": "Heuristic",
+            "manual": "Manual"
+        }
+    },
+    "chat": {
+        "title": "Auto Chat",
+        "prompt_label": "Conversation Prompt:",
+        "prompt_placeholder": "Describe the conversation style...",
+        "rounds": "Rounds:",
+        "max_wait": "Max Wait (sec):",
+        "read_replies": "Read Replies",
+        "start": "Start Auto Chat",
+        "stop": "Stop",
+        "conversation": "Conversation",
+        "log": "Log"
+    },
+    "manual": {
+        "title": "Quick Send:",
+        "input_placeholder": "Enter message...",
+        "send": "Send"
+    },
+    "status": {
+        "ready": "Ready",
+        "detecting": "Detecting areas...",
+        "generating": "Generating: {text}",
+        "waiting": "Waiting for reply... ({elapsed}/{max}s)",
+        "round": "Round {current}/{total}",
+        "sent": "Message sent",
+        "completed": "Completed {count} rounds",
+        "stopped": "Stopped",
+        "error": "Error: {message}"
+    },
+    "overlay": {
+        "chat_hint": "Draw [Chat Message Area] (green), press ESC to cancel",
+        "input_hint": "Draw [Input Box Area] (blue), press ESC to cancel",
+        "send_hint": "Click [Send Button] position (orange), press ESC to cancel"
+    },
+    "dialog": {
+        "about_title": "About LLM Chat",
+        "about_text": "LLM Chat v{version}\n\nVision-based GUI interaction assistant with LLM integration.\n\nSupports any OpenAI-compatible API (Ollama, OpenAI, etc.)",
+        "error_title": "Error",
+        "warning_title": "Warning",
+        "confirm_title": "Confirm",
+        "no_prompt": "Please enter a conversation prompt",
+        "window_closed": "Target window is closed"
+    }
+}

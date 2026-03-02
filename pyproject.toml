@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-chat"
+dynamic = ["version"]
+description = "Vision-based GUI interaction assistant with LLM integration"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+authors = [
+    {name = "LLM Chat Contributors"}
+]
+keywords = ["llm", "chat", "automation", "vision", "ocr", "desktop", "gui", "agent"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Desktop Environment",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+requires-python = ">=3.9"
+
+dependencies = [
+    "PySide6>=6.4.0",
+    "requests>=2.28.0",
+    "pyautogui>=0.9.53",
+    "pyperclip>=1.8.2",
+    "Pillow>=9.3.0",
+    "numpy>=1.24.0",
+    "pywin32>=305",
+]
+
+[project.optional-dependencies]
+ocr = [
+    "easyocr>=1.6.2",
+]
+openai = [
+    "openai>=1.0.0",
+]
+anthropic = [
+    "anthropic>=0.18.0",
+]
+all = [
+    "easyocr>=1.6.2",
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+]
+dev = [
+    "pytest>=7.2.0",
+    "pytest-qt>=4.2.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "build>=1.0.0",
+    "twine>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/cycleuser/llm-chat"
+Documentation = "https://github.com/cycleuser/llm-chat#readme"
+Repository = "https://github.com/cycleuser/llm-chat"
+Issues = "https://github.com/cycleuser/llm-chat/issues"
+
+[project.scripts]
+llm-chat = "llm_chat.cli:main"
+
+[project.gui-scripts]
+llm-chat-gui = "llm_chat.cli:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "llm_chat._version.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+llm_chat = ["gui/i18n/*.json"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39", "py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
