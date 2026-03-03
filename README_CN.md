@@ -43,7 +43,7 @@ pip install -e ".[all,dev]"
 ## 系统要求
 
 - Python 3.9+
-- Windows系统（使用Win32 API）
+- Windows、Linux 或 macOS（Windows下功能完整，Linux/macOS下基础自动化）
 - OCR需要: EasyOCR、RapidOCR或pytesseract
 - LLM需要: 本地运行的Ollama，或任意OpenAI兼容API和API密钥
 

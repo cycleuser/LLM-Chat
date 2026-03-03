@@ -39,8 +39,8 @@ class ScreenshotReader:
         try:
             import pyautogui
             self._pyautogui = pyautogui
-        except ImportError:
-            logger.warning("pyautogui not available - screenshot disabled")
+        except Exception as e:
+            logger.warning(f"pyautogui not available - screenshot disabled: {e}")
         
         try:
             from PIL import Image

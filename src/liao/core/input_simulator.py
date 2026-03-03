@@ -1,10 +1,13 @@
-"""Input simulation module using Win32 SendInput API."""
+"""Input simulation module with cross-platform support.
+
+Uses Win32 SendInput API on Windows for best performance,
+falls back to pyautogui on other platforms.
+"""
 
 from __future__ import annotations
 
-import ctypes
-import ctypes.wintypes
 import logging
+import sys
 import time
 from typing import TYPE_CHECKING
 
@@ -13,72 +16,79 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Windows constants
-MOUSEEVENTF_MOVE = 0x0001
-MOUSEEVENTF_LEFTDOWN = 0x0002
-MOUSEEVENTF_LEFTUP = 0x0004
-MOUSEEVENTF_ABSOLUTE = 0x8000
-MOUSEEVENTF_VIRTUALDESK = 0x4000
-KEYEVENTF_KEYUP = 0x0002
-INPUT_MOUSE = 0
-INPUT_KEYBOARD = 1
+# Check platform
+IS_WINDOWS = sys.platform == "win32"
 
-# Virtual key codes
-VK_CONTROL = 0x11
-VK_RETURN = 0x0D
-VK_BACK = 0x08
-VK_DELETE = 0x2E
-VK_ESCAPE = 0x1B
-VK_MENU = 0x12  # Alt
-VK_SHIFT = 0x10
-VK_TAB = 0x09
+# Windows-specific constants and structures
+if IS_WINDOWS:
+    import ctypes
+    import ctypes.wintypes
 
-# Key name to VK code mapping
-VK_MAP = {
-    "enter": VK_RETURN, "return": VK_RETURN,
-    "backspace": VK_BACK, "delete": VK_DELETE,
-    "escape": VK_ESCAPE, "esc": VK_ESCAPE,
-    "ctrl": VK_CONTROL, "control": VK_CONTROL,
-    "alt": VK_MENU, "tab": VK_TAB, "shift": VK_SHIFT,
-    "a": 0x41, "b": 0x42, "c": 0x43, "d": 0x44, "e": 0x45,
-    "f": 0x46, "g": 0x47, "h": 0x48, "i": 0x49, "j": 0x4A,
-    "k": 0x4B, "l": 0x4C, "m": 0x4D, "n": 0x4E, "o": 0x4F,
-    "p": 0x50, "q": 0x51, "r": 0x52, "s": 0x53, "t": 0x54,
-    "u": 0x55, "v": 0x56, "w": 0x57, "x": 0x58, "y": 0x59, "z": 0x5A,
-}
+    # Windows constants
+    MOUSEEVENTF_MOVE = 0x0001
+    MOUSEEVENTF_LEFTDOWN = 0x0002
+    MOUSEEVENTF_LEFTUP = 0x0004
+    MOUSEEVENTF_ABSOLUTE = 0x8000
+    MOUSEEVENTF_VIRTUALDESK = 0x4000
+    KEYEVENTF_KEYUP = 0x0002
+    INPUT_MOUSE = 0
+    INPUT_KEYBOARD = 1
 
+    # Virtual key codes
+    VK_CONTROL = 0x11
+    VK_RETURN = 0x0D
+    VK_BACK = 0x08
+    VK_DELETE = 0x2E
+    VK_ESCAPE = 0x1B
+    VK_MENU = 0x12  # Alt
+    VK_SHIFT = 0x10
+    VK_TAB = 0x09
 
-class MOUSEINPUT(ctypes.Structure):
-    _fields_ = [
-        ("dx", ctypes.wintypes.LONG),
-        ("dy", ctypes.wintypes.LONG),
-        ("mouseData", ctypes.wintypes.DWORD),
-        ("dwFlags", ctypes.wintypes.DWORD),
-        ("time", ctypes.wintypes.DWORD),
-        ("dwExtraInfo", ctypes.POINTER(ctypes.wintypes.ULONG)),
-    ]
+    # Key name to VK code mapping
+    VK_MAP = {
+        "enter": VK_RETURN, "return": VK_RETURN,
+        "backspace": VK_BACK, "delete": VK_DELETE,
+        "escape": VK_ESCAPE, "esc": VK_ESCAPE,
+        "ctrl": VK_CONTROL, "control": VK_CONTROL,
+        "alt": VK_MENU, "tab": VK_TAB, "shift": VK_SHIFT,
+        "a": 0x41, "b": 0x42, "c": 0x43, "d": 0x44, "e": 0x45,
+        "f": 0x46, "g": 0x47, "h": 0x48, "i": 0x49, "j": 0x4A,
+        "k": 0x4B, "l": 0x4C, "m": 0x4D, "n": 0x4E, "o": 0x4F,
+        "p": 0x50, "q": 0x51, "r": 0x52, "s": 0x53, "t": 0x54,
+        "u": 0x55, "v": 0x56, "w": 0x57, "x": 0x58, "y": 0x59, "z": 0x5A,
+    }
 
+    class MOUSEINPUT(ctypes.Structure):
+        _fields_ = [
+            ("dx", ctypes.wintypes.LONG),
+            ("dy", ctypes.wintypes.LONG),
+            ("mouseData", ctypes.wintypes.DWORD),
+            ("dwFlags", ctypes.wintypes.DWORD),
+            ("time", ctypes.wintypes.DWORD),
+            ("dwExtraInfo", ctypes.POINTER(ctypes.wintypes.ULONG)),
+        ]
 
-class KEYBDINPUT(ctypes.Structure):
-    _fields_ = [
-        ("wVk", ctypes.wintypes.WORD),
-        ("wScan", ctypes.wintypes.WORD),
-        ("dwFlags", ctypes.wintypes.DWORD),
-        ("time", ctypes.wintypes.DWORD),
-        ("dwExtraInfo", ctypes.POINTER(ctypes.wintypes.ULONG)),
-    ]
+    class KEYBDINPUT(ctypes.Structure):
+        _fields_ = [
+            ("wVk", ctypes.wintypes.WORD),
+            ("wScan", ctypes.wintypes.WORD),
+            ("dwFlags", ctypes.wintypes.DWORD),
+            ("time", ctypes.wintypes.DWORD),
+            ("dwExtraInfo", ctypes.POINTER(ctypes.wintypes.ULONG)),
+        ]
 
+    class _INPUT_UNION(ctypes.Union):
+        _fields_ = [("mi", MOUSEINPUT), ("ki", KEYBDINPUT)]
 
-class _INPUT_UNION(ctypes.Union):
-    _fields_ = [("mi", MOUSEINPUT), ("ki", KEYBDINPUT)]
-
-
-class INPUT(ctypes.Structure):
-    _fields_ = [("type", ctypes.wintypes.DWORD), ("union", _INPUT_UNION)]
+    class INPUT(ctypes.Structure):
+        _fields_ = [("type", ctypes.wintypes.DWORD), ("union", _INPUT_UNION)]
 
 
 class InputSimulator:
-    """Simulates mouse and keyboard input using Win32 SendInput.
+    """Simulates mouse and keyboard input.
+    
+    Uses Win32 SendInput on Windows for best performance,
+    falls back to pyautogui on Linux/macOS.
     
     Example:
         sim = InputSimulator()
@@ -89,25 +99,55 @@ class InputSimulator:
     """
 
     def __init__(self):
-        self._user32 = ctypes.windll.user32
+        self._pyautogui = None
         self._pyperclip = None
-        self._load_pyperclip()
+        self._user32 = None
+        self._use_win32 = False
+        self._load_deps()
 
-    def _load_pyperclip(self):
-        """Load pyperclip for clipboard operations."""
+    def _load_deps(self):
+        """Load dependencies based on platform."""
+        # Load pyperclip for clipboard operations
         try:
             import pyperclip
             self._pyperclip = pyperclip
         except ImportError:
             logger.warning("pyperclip not available - clipboard operations disabled")
+        
+        # Load pyautogui as fallback
+        try:
+            import pyautogui
+            self._pyautogui = pyautogui
+            # Disable pyautogui's fail-safe (moving to corner stops program)
+            pyautogui.FAILSAFE = False
+        except Exception as e:
+            logger.warning(f"pyautogui not available - some input features disabled: {e}")
+        
+        # On Windows, prefer Win32 API
+        if IS_WINDOWS:
+            try:
+                self._user32 = ctypes.windll.user32
+                self._use_win32 = True
+                logger.debug("Using Win32 SendInput API")
+            except Exception as e:
+                logger.warning(f"Win32 API not available: {e}")
+                self._use_win32 = False
 
-    def _send_input(self, *inputs: INPUT) -> int:
-        """Send input events via SendInput API."""
+    def is_available(self) -> bool:
+        """Check if input simulation is available."""
+        return self._use_win32 or self._pyautogui is not None
+
+    def _send_input(self, *inputs) -> int:
+        """Send input events via SendInput API (Windows only)."""
+        if not self._use_win32:
+            return 0
         arr = (INPUT * len(inputs))(*inputs)
         return self._user32.SendInput(len(inputs), arr, ctypes.sizeof(INPUT))
 
     def _abs_coords(self, x: int, y: int) -> tuple[int, int]:
         """Convert screen coordinates to SendInput normalized 0-65535 range."""
+        if not self._use_win32:
+            return x, y
         sm_xvscreen = self._user32.GetSystemMetrics(76)
         sm_yvscreen = self._user32.GetSystemMetrics(77)
         sm_cxvscreen = self._user32.GetSystemMetrics(78)
@@ -117,14 +157,17 @@ class InputSimulator:
         return nx, ny
 
     def focus_window(self, hwnd: int) -> bool:
-        """Bring window to foreground using thread-attach trick.
+        """Bring window to foreground.
         
         Args:
-            hwnd: Window handle to focus
+            hwnd: Window handle to focus (Windows only)
             
         Returns:
             True if successful
         """
+        if not self._use_win32:
+            logger.debug("focus_window not supported on this platform")
+            return False
         try:
             SW_RESTORE = 9
             if self._user32.IsIconic(hwnd):
@@ -157,22 +200,25 @@ class InputSimulator:
             duration: Animation duration in seconds (0 for instant)
             steps: Number of animation steps
         """
-        pt = ctypes.wintypes.POINT()
-        self._user32.GetCursorPos(ctypes.byref(pt))
-        sx, sy = pt.x, pt.y
-        
-        if duration <= 0 or steps <= 1:
-            self._user32.SetCursorPos(x, y)
-            return
-        
-        for i in range(1, steps + 1):
-            t = i / steps
-            # Ease in-out cubic
-            t = t * t * (3 - 2 * t)
-            cx = int(sx + (x - sx) * t)
-            cy = int(sy + (y - sy) * t)
-            self._user32.SetCursorPos(cx, cy)
-            time.sleep(duration / steps)
+        if self._use_win32:
+            pt = ctypes.wintypes.POINT()
+            self._user32.GetCursorPos(ctypes.byref(pt))
+            sx, sy = pt.x, pt.y
+            
+            if duration <= 0 or steps <= 1:
+                self._user32.SetCursorPos(x, y)
+                return
+            
+            for i in range(1, steps + 1):
+                t = i / steps
+                # Ease in-out cubic
+                t = t * t * (3 - 2 * t)
+                cx = int(sx + (x - sx) * t)
+                cy = int(sy + (y - sy) * t)
+                self._user32.SetCursorPos(cx, cy)
+                time.sleep(duration / steps)
+        elif self._pyautogui:
+            self._pyautogui.moveTo(x, y, duration=duration)
 
     def click(self, x: int | None = None, y: int | None = None) -> None:
         """Click at (x, y) or current position.
@@ -181,27 +227,33 @@ class InputSimulator:
             x: Optional x coordinate
             y: Optional y coordinate
         """
-        if x is not None and y is not None:
-            nx, ny = self._abs_coords(x, y)
-            down = INPUT(type=INPUT_MOUSE)
-            down.union.mi = MOUSEINPUT(
-                dx=nx, dy=ny, mouseData=0,
-                dwFlags=MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN,
-                time=0, dwExtraInfo=None,
-            )
-            up = INPUT(type=INPUT_MOUSE)
-            up.union.mi = MOUSEINPUT(
-                dx=nx, dy=ny, mouseData=0,
-                dwFlags=MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTUP,
-                time=0, dwExtraInfo=None,
-            )
-            self._send_input(down, up)
-        else:
-            down = INPUT(type=INPUT_MOUSE)
-            down.union.mi = MOUSEINPUT(dx=0, dy=0, mouseData=0, dwFlags=MOUSEEVENTF_LEFTDOWN, time=0, dwExtraInfo=None)
-            up = INPUT(type=INPUT_MOUSE)
-            up.union.mi = MOUSEINPUT(dx=0, dy=0, mouseData=0, dwFlags=MOUSEEVENTF_LEFTUP, time=0, dwExtraInfo=None)
-            self._send_input(down, up)
+        if self._use_win32:
+            if x is not None and y is not None:
+                nx, ny = self._abs_coords(x, y)
+                down = INPUT(type=INPUT_MOUSE)
+                down.union.mi = MOUSEINPUT(
+                    dx=nx, dy=ny, mouseData=0,
+                    dwFlags=MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN,
+                    time=0, dwExtraInfo=None,
+                )
+                up = INPUT(type=INPUT_MOUSE)
+                up.union.mi = MOUSEINPUT(
+                    dx=nx, dy=ny, mouseData=0,
+                    dwFlags=MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTUP,
+                    time=0, dwExtraInfo=None,
+                )
+                self._send_input(down, up)
+            else:
+                down = INPUT(type=INPUT_MOUSE)
+                down.union.mi = MOUSEINPUT(dx=0, dy=0, mouseData=0, dwFlags=MOUSEEVENTF_LEFTDOWN, time=0, dwExtraInfo=None)
+                up = INPUT(type=INPUT_MOUSE)
+                up.union.mi = MOUSEINPUT(dx=0, dy=0, mouseData=0, dwFlags=MOUSEEVENTF_LEFTUP, time=0, dwExtraInfo=None)
+                self._send_input(down, up)
+        elif self._pyautogui:
+            if x is not None and y is not None:
+                self._pyautogui.click(x, y)
+            else:
+                self._pyautogui.click()
 
     def move_and_click(self, x: int, y: int, duration: float = 0.2) -> None:
         """Move to position and click.
@@ -221,15 +273,18 @@ class InputSimulator:
         Args:
             key: Key name (e.g., "enter", "a", "ctrl")
         """
-        vk = VK_MAP.get(key.lower(), 0)
-        if not vk:
-            logger.warning(f"Unknown key: {key}")
-            return
-        down = INPUT(type=INPUT_KEYBOARD)
-        down.union.ki = KEYBDINPUT(wVk=vk, wScan=0, dwFlags=0, time=0, dwExtraInfo=None)
-        up = INPUT(type=INPUT_KEYBOARD)
-        up.union.ki = KEYBDINPUT(wVk=vk, wScan=0, dwFlags=KEYEVENTF_KEYUP, time=0, dwExtraInfo=None)
-        self._send_input(down, up)
+        if self._use_win32:
+            vk = VK_MAP.get(key.lower(), 0)
+            if not vk:
+                logger.warning(f"Unknown key: {key}")
+                return
+            down = INPUT(type=INPUT_KEYBOARD)
+            down.union.ki = KEYBDINPUT(wVk=vk, wScan=0, dwFlags=0, time=0, dwExtraInfo=None)
+            up = INPUT(type=INPUT_KEYBOARD)
+            up.union.ki = KEYBDINPUT(wVk=vk, wScan=0, dwFlags=KEYEVENTF_KEYUP, time=0, dwExtraInfo=None)
+            self._send_input(down, up)
+        elif self._pyautogui:
+            self._pyautogui.press(key)
 
     def hotkey(self, *keys: str) -> None:
         """Press a key combination (e.g., Ctrl+V).
@@ -237,25 +292,28 @@ class InputSimulator:
         Args:
             *keys: Key names to press in sequence
         """
-        inputs = []
-        # Key down events
-        for k in keys:
-            vk = VK_MAP.get(k.lower(), 0)
-            if not vk:
-                continue
-            inp = INPUT(type=INPUT_KEYBOARD)
-            inp.union.ki = KEYBDINPUT(wVk=vk, wScan=0, dwFlags=0, time=0, dwExtraInfo=None)
-            inputs.append(inp)
-        # Key up events (reversed order)
-        for k in reversed(keys):
-            vk = VK_MAP.get(k.lower(), 0)
-            if not vk:
-                continue
-            inp = INPUT(type=INPUT_KEYBOARD)
-            inp.union.ki = KEYBDINPUT(wVk=vk, wScan=0, dwFlags=KEYEVENTF_KEYUP, time=0, dwExtraInfo=None)
-            inputs.append(inp)
-        if inputs:
-            self._send_input(*inputs)
+        if self._use_win32:
+            inputs = []
+            # Key down events
+            for k in keys:
+                vk = VK_MAP.get(k.lower(), 0)
+                if not vk:
+                    continue
+                inp = INPUT(type=INPUT_KEYBOARD)
+                inp.union.ki = KEYBDINPUT(wVk=vk, wScan=0, dwFlags=0, time=0, dwExtraInfo=None)
+                inputs.append(inp)
+            # Key up events (reversed order)
+            for k in reversed(keys):
+                vk = VK_MAP.get(k.lower(), 0)
+                if not vk:
+                    continue
+                inp = INPUT(type=INPUT_KEYBOARD)
+                inp.union.ki = KEYBDINPUT(wVk=vk, wScan=0, dwFlags=KEYEVENTF_KEYUP, time=0, dwExtraInfo=None)
+                inputs.append(inp)
+            if inputs:
+                self._send_input(*inputs)
+        elif self._pyautogui:
+            self._pyautogui.hotkey(*keys)
 
     def send_enter(self) -> None:
         """Press Enter key."""
@@ -302,7 +360,7 @@ class InputSimulator:
             x: Input field x coordinate
             y: Input field y coordinate
             text: Text to type
-            hwnd: Optional window handle to focus first
+            hwnd: Optional window handle to focus first (Windows only)
             clear_first: Whether to clear existing text
             move_duration: Mouse movement duration
             
@@ -334,7 +392,7 @@ class InputSimulator:
         Args:
             x: Button x coordinate
             y: Button y coordinate
-            hwnd: Optional window handle to focus first
+            hwnd: Optional window handle to focus first (Windows only)
             move_duration: Mouse movement duration
         """
         if hwnd:

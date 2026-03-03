@@ -43,7 +43,7 @@ pip install -e ".[all,dev]"
 ## Requirements
 
 - Python 3.9+
-- Windows (uses Win32 APIs)
+- Windows, Linux, or macOS (full features on Windows, basic automation on Linux/macOS)
 - For OCR: EasyOCR, RapidOCR, or pytesseract
 - For LLM: Ollama running locally, or any OpenAI-compatible API with API key
 
