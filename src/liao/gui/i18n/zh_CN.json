@@ -29,12 +29,16 @@
         "api_key_hint": "本地 Ollama 可不填",
         "connect": "连接",
         "disconnect": "断开",
+        "save": "保存",
         "status": {
             "disconnected": "未连接",
             "connecting": "连接中...",
+            "auto_connecting": "正在连接本地 Ollama...",
             "connected": "已连接 - {count} 个模型可用",
             "failed": "连接失败 - 请检查服务是否运行",
-            "no_models": "已连接但无模型 - 请先拉取模型"
+            "no_models": "已连接但无模型 - 请先拉取模型",
+            "saved": "已保存模型: {model}",
+            "save_failed": "未选择模型"
         }
     },
     "window": {
@@ -56,6 +60,7 @@
         "clear": "清除",
         "preview": "截图预览",
         "info": "检测信息将显示在这里",
+        "warning_no_ocr": "未找到OCR引擎，自动检测将仅使用启发式方法。\n安装: pip install easyocr",
         "detection": {
             "method": "检测: {method} ({confidence})",
             "ocr": "OCR",
@@ -67,13 +72,16 @@
         "title": "自动对话",
         "prompt_label": "对话提示词:",
         "prompt_placeholder": "描述对话风格...",
+        "prompt_default": "你是一个友好的助手。回复要自然简短（1-3句话），像真正的对话一样。匹配对方的语气和风格。",
         "rounds": "轮数:",
         "max_wait": "最长等待(秒):",
         "read_replies": "识别回复",
         "start": "开始自动对话",
         "stop": "停止",
         "conversation": "对话",
-        "log": "日志"
+        "log": "日志",
+        "warning_no_ocr": "未找到OCR引擎，回复识别将不可用。\n安装: pip install easyocr",
+        "warning_no_input": "未找到xdotool，输入模拟已禁用。\n安装: sudo apt install xdotool\n安装后请重启Liao。"
     },
     "manual": {
         "title": "快速发送:",
@@ -103,6 +111,9 @@
         "warning_title": "警告",
         "confirm_title": "确认",
         "no_prompt": "请输入对话提示词",
-        "window_closed": "目标窗口已关闭"
+        "window_closed": "目标窗口已关闭",
+        "screen_permission_title": "屏幕捕获权限",
+        "screen_permission_text": "聊 需要屏幕捕获权限来读取聊天消息。\n\n系统将弹出授权对话框，请选择您的屏幕并点击「共享」。",
+        "screen_permission_failed": "未获得屏幕捕获权限。\n\n没有此权限，聊 无法截取屏幕来读取聊天消息。\n\n请重启应用并在提示时授予权限。"
     }
 }

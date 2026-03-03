@@ -73,13 +73,14 @@ class OllamaClient(BaseLLMClient):
         """List models suitable for chat (excluding embedding models).
         
         Returns:
-            List of chat model names
+            List of chat model names, sorted alphabetically
         """
         embed_patterns = ("embed", "nomic", "bge", "e5-", "mxbai")
-        return [
+        models = [
             m for m in self.list_models()
             if not any(p in m.lower() for p in embed_patterns)
         ]
+        return sorted(models, key=str.lower)
 
     def chat(
         self,
@@ -169,7 +170,12 @@ class OllamaClient(BaseLLMClient):
     def _pick_default(self) -> str:
         """Pick a default model if none specified."""
         chat_models = self.get_chat_models()
+        # Prefer gemma3:1b if available
+        if "gemma3:1b" in chat_models:
+            return "gemma3:1b"
         if chat_models:
             return chat_models[0]
         all_models = self.list_models()
+        if "gemma3:1b" in all_models:
+            return "gemma3:1b"
         return all_models[0] if all_models else "llama3"

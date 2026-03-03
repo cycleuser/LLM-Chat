@@ -42,6 +42,10 @@ dependencies = [
 ocr = [
     "easyocr>=1.6.2",
 ]
+ocr-lite = [
+    "rapidocr-onnxruntime>=1.2.0; python_version < '3.13'",
+    "pytesseract>=0.3.10",
+]
 openai = [
     "openai>=1.0.0",
 ]

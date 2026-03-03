@@ -15,14 +15,63 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# System text patterns to filter (timestamps, status, media)
+# System text patterns to filter (timestamps, status, media, UI chrome)
 SYSTEM_TEXT_PATTERNS = [
+    # --- timestamps & dates ---
     re.compile(r"^\d{1,2}:\d{2}(:\d{2})?$"),
     re.compile(r"^(AM|PM|上午|下午)\s*\d{1,2}:\d{2}$", re.IGNORECASE),
     re.compile(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}$"),
     re.compile(r"^(Yesterday|Today|Tomorrow|昨天|前天|今天|星期[一二三四五六日天]|周[一二三四五六日天])$", re.IGNORECASE),
+    # Combined date+time: "昨天 14:08", "星期三 10:30", "12月25日 15:00", etc.
+    re.compile(
+        r"^(昨天|前天|今天|星期[一二三四五六日天]|周[一二三四五六日天]"
+        r"|Yesterday|Today|Tomorrow"
+        r"|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday"
+        r"|\d{1,2}月\d{1,2}日?"
+        r"|\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?"
+        r"|\d{1,2}[-/]\d{1,2})"
+        r"\s+\d{1,2}:\d{2}(:\d{2})?$",
+        re.IGNORECASE,
+    ),
+    # Time with AM/PM prefix or suffix: "下午 3:30", "3:30 PM"
+    re.compile(r"^(上午|下午|AM|PM)\s*\d{1,2}:\d{2}$", re.IGNORECASE),
+    re.compile(r"^\d{1,2}:\d{2}\s*(上午|下午|AM|PM)$", re.IGNORECASE),
+    # --- message status & system notices ---
     re.compile(r"^(Read|Sent|Delivered|Typing|已读|已撤回|对方正在输入|消息已发送|以下为新消息)", re.IGNORECASE),
     re.compile(r"^\[(Image|Photo|Voice|Video|File|Location|Contact|Sticker|图片|语音|视频|文件|位置|名片|红包|转账)\]$", re.IGNORECASE),
+    # --- app title / branding ---
+    re.compile(
+        r"^(WeChat|微信|微信电脑版|WeCom|企业微信|WeChat\s*For\s*Windows"
+        r"|Telegram(\s*Desktop)?|QQ|TIM|钉钉|DingTalk|飞书|Lark|Feishu"
+        r"|Slack|Discord|Microsoft\s*Teams|Teams|Signal)$",
+        re.IGNORECASE,
+    ),
+    # --- file size / dimensions (e.g. "2.5MB", "100KB", "1920x1080") ---
+    re.compile(r"^\d+(\.\d+)?\s*(B|KB|MB|GB|TB|字节)$", re.IGNORECASE),
+    re.compile(r"^\d{2,5}\s*[x×]\s*\d{2,5}$"),
+    # --- group chat system messages ---
+    re.compile(r"(撤回了一条消息|加入了?群聊|退出了?群聊|移出了?群聊|修改了群名|已添加了|邀请.*加入)", re.IGNORECASE),
+    re.compile(r"(recalled a message|joined the group|left the group|removed from.*group)", re.IGNORECASE),
+    # --- common UI chrome labels (exact match) ---
+    re.compile(
+        r"^(发送|取消|确定|复制|转发|收藏|删除|撤回|多选|引用|搜索|设置"
+        r"|Send|Cancel|Copy|Forward|Delete|Recall|Search|Settings"
+        r"|聊天记录|Chat\s*History|查看更多消息?|Loading"
+        r"|聊天|通讯录|朋友圈|收藏夹|小程序"
+        r"|Chats?|Contacts?|Moments|Favorites|Mini\s*Programs?"
+        r"|在线|Online|离线|Offline|忙碌|Busy"
+        r"|文件助手|File\s*(Transfer|Helper)"
+        r"|以上是打招呼的内容|拍了拍"
+        r"|Reply|Source|Verify\s*Now|Group\s*chat"
+        r"|Add\s*to\s*contacts?|Accept|Decline|Block"
+        r"|Official\s*Account|Subscription|Service"
+        r"|Translate|Select\s*Text|Pin|Unpin|Mute"
+        r"|More|Edit|Save|Close|Back|Done|OK|Yes|No"
+        r"|People\s*nearby|Shake|Scan|Money|Top\s*Stories"
+        r"|Stickers?|Emoji|GIF|Photo|Album|Video\s*Call"
+        r"|Voice\s*Call|Location|Contact\s*Card|Favorites?)$",
+        re.IGNORECASE,
+    ),
 ]
 
 
@@ -75,10 +124,15 @@ class OCRChatParser:
         """
         image = self._reader.capture_region(window_info, chat_rect)
         if image is None:
+            logger.warning("parse_chat_area: capture_region returned None")
             return []
         
         results = self._reader.extract_with_bboxes(image)
         if not results:
+            logger.info(
+                "parse_chat_area: no OCR results for region %s (image %dx%d)",
+                chat_rect, image.size[0], image.size[1],
+            )
             return []
         
         img_w, _ = image.size
@@ -102,13 +156,33 @@ class OCRChatParser:
         items = []
         for bbox, text, conf in results:
             if is_system_text(text):
+                logger.debug("Filtered system text: %r", text)
                 continue
             cx = sum(p[0] for p in bbox) / 4
             cy = sum(p[1] for p in bbox) / 4
             left_x = min(p[0] for p in bbox)
             right_x = max(p[0] for p in bbox)
+            text_width = right_x - left_x
             top_y = min(p[1] for p in bbox)
+
+            # Filter centered short text (likely timestamps or system notices
+            # that weren't caught by pattern matching).
+            # Centered = center x is between 35%-65% of image width
+            # AND text is narrow (< 40% of image width)
+            cx_ratio = cx / image_width if image_width else 0.5
+            width_ratio = text_width / image_width if image_width else 1.0
+            if width_ratio < 0.40 and 0.35 < cx_ratio < 0.65:
+                logger.debug(
+                    "Filtered centered text: %r (cx=%.0f%%, w=%.0f%%)",
+                    text, cx_ratio * 100, width_ratio * 100,
+                )
+                continue
+
             side = "left" if cx < image_width * 0.5 else "right"
+            logger.debug(
+                "OCR item: %r  side=%s  left_x=%d  right_x=%d  cx=%.0f%%",
+                text, side, left_x, right_x, cx_ratio * 100,
+            )
             items.append({
                 "text": text,
                 "cx": cx,
@@ -149,6 +223,10 @@ class OCRChatParser:
             right_margin = image_width - first["right_x"]
             # Determine sender based on alignment
             sender = "other" if left_margin < right_margin else "self"
+            logger.debug(
+                "Message: sender=%s  lm=%d  rm=%d  text=%r",
+                sender, left_margin, right_margin, text[:60],
+            )
             messages.append(ChatMessage(sender=sender, content=text))
 
         return messages

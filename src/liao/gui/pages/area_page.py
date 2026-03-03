@@ -132,6 +132,10 @@ class AreaPage(BasePage):
         if not mw._selected_window:
             return
         
+        # Show OCR hint if no OCR engine is available
+        if not mw._screenshot_reader.has_ocr():
+            self._info_label.setText(tr("area.warning_no_ocr"))
+        
         detector = ChatAreaDetector(mw._screenshot_reader)
         mw._detected_areas = detector.detect_areas(mw._selected_window)
         

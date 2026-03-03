@@ -29,12 +29,16 @@
         "api_key_hint": "Optional for local Ollama",
         "connect": "Connect",
         "disconnect": "Disconnect",
+        "save": "Save",
         "status": {
             "disconnected": "Not connected",
             "connecting": "Connecting...",
+            "auto_connecting": "Connecting to local Ollama...",
             "connected": "Connected - {count} models available",
             "failed": "Connection failed - Check if server is running",
-            "no_models": "Connected but no models - Please pull a model first"
+            "no_models": "Connected but no models - Please pull a model first",
+            "saved": "Model saved: {model}",
+            "save_failed": "No model selected"
         }
     },
     "window": {
@@ -56,6 +60,7 @@
         "clear": "Clear",
         "preview": "Screenshot Preview",
         "info": "Detection info will appear here",
+        "warning_no_ocr": "No OCR engine. Auto detect uses heuristics only.\nInstall: pip install easyocr",
         "detection": {
             "method": "Detection: {method} ({confidence})",
             "ocr": "OCR",
@@ -67,13 +72,16 @@
         "title": "Auto Chat",
         "prompt_label": "Conversation Prompt:",
         "prompt_placeholder": "Describe the conversation style...",
+        "prompt_default": "You are a friendly assistant. Respond naturally and briefly (1-3 sentences), like a real conversation. Match the other person's tone and style.",
         "rounds": "Rounds:",
         "max_wait": "Max Wait (sec):",
         "read_replies": "Read Replies",
         "start": "Start Auto Chat",
         "stop": "Stop",
         "conversation": "Conversation",
-        "log": "Log"
+        "log": "Log",
+        "warning_no_ocr": "No OCR engine found. Reply detection will not work.\nInstall: pip install easyocr",
+        "warning_no_input": "xdotool not found. Input simulation is disabled.\nInstall: sudo apt install xdotool\nThen restart Liao."
     },
     "manual": {
         "title": "Quick Send:",
@@ -103,6 +111,9 @@
         "warning_title": "Warning",
         "confirm_title": "Confirm",
         "no_prompt": "Please enter a conversation prompt",
-        "window_closed": "Target window is closed"
+        "window_closed": "Target window is closed",
+        "screen_permission_title": "Screen Capture Permission",
+        "screen_permission_text": "Liao needs screen capture permission to read chat messages.\n\nA system dialog will appear. Please select your screen and click Share.",
+        "screen_permission_failed": "Screen capture permission was not granted.\n\nWithout this permission, Liao cannot capture screenshots to read chat messages.\n\nPlease restart the application and grant permission when prompted."
     }
 }

@@ -41,7 +41,19 @@ class ChatAreaDetector:
         if self._reader.has_ocr():
             result = self._detect_via_ocr(window_info)
             if result is not None:
-                return result
+                # Validate: detected area must be reasonably large
+                cr = result.chat_area_rect
+                cw = cr[2] - cr[0]
+                ch = cr[3] - cr[1]
+                ww = window_info.rect[2] - window_info.rect[0]
+                wh = window_info.rect[3] - window_info.rect[1]
+                if cw >= ww * 0.25 and ch >= wh * 0.30:
+                    return result
+                logger.info(
+                    "OCR-detected area too small (%dx%d for %dx%d window), "
+                    "using heuristic",
+                    cw, ch, ww, wh,
+                )
         return self._detect_via_heuristic(window_info)
 
     def _detect_via_ocr(self, window_info: "WindowInfo") -> AreaDetectionResult | None:
@@ -163,26 +175,53 @@ class ChatAreaDetector:
     def _detect_via_heuristic(window_info: "WindowInfo") -> AreaDetectionResult:
         """Detect areas using heuristic estimation.
         
-        Uses typical chat app layout assumptions:
-        - Chat area takes up most of the right side
-        - Input area is at the bottom
+        Uses app-specific layout assumptions when the app type is known,
+        otherwise falls back to generic chat layout.
         """
         wl, wt, wr, wb = window_info.rect
         ww, wh = wr - wl, wb - wt
         
+        # App-specific layouts
+        app = window_info.app_type
+        if app in ("wechat", "wecom"):
+            # WeChat / WeCom: left sidebar ~22%, right chat area
+            sidebar = 0.22
+            header = 0.06
+            input_h = 0.13
+        elif app == "qq":
+            # QQ: left sidebar ~25%, right chat area
+            sidebar = 0.25
+            header = 0.06
+            input_h = 0.15
+        elif app == "telegram":
+            # Telegram: left sidebar ~30%, right chat area
+            sidebar = 0.30
+            header = 0.05
+            input_h = 0.08
+        elif app in ("dingtalk", "feishu"):
+            # DingTalk / Feishu: left sidebar ~22%
+            sidebar = 0.22
+            header = 0.06
+            input_h = 0.12
+        elif app in ("slack", "discord", "teams"):
+            # Slack / Discord / Teams: left sidebar ~20%
+            sidebar = 0.20
+            header = 0.05
+            input_h = 0.10
+        else:
+            # Generic: assume sidebar on left ~45%
+            sidebar = 0.45
+            header = 0.05
+            input_h = 0.15
+        
+        chat_left = wl + int(ww * sidebar)
+        chat_top = wt + int(wh * header)
+        chat_right = wr - int(ww * 0.01)
+        input_top = wb - int(wh * input_h)
+        
         return AreaDetectionResult(
-            chat_area_rect=(
-                wl + int(ww * 0.55),
-                wt + int(wh * 0.05),
-                wr - int(ww * 0.02),
-                wb - int(wh * 0.15)
-            ),
-            input_area_rect=(
-                wl + int(ww * 0.55),
-                wb - int(wh * 0.15),
-                wr - int(ww * 0.02),
-                wb
-            ),
+            chat_area_rect=(chat_left, chat_top, chat_right, input_top),
+            input_area_rect=(chat_left, input_top, chat_right, wb),
             method="heuristic",
-            confidence=0.3,
+            confidence=0.5 if app != "other" else 0.3,
         )

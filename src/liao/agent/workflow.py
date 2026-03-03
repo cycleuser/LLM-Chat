@@ -10,7 +10,7 @@ from .conversation import ConversationMemory
 from .chat_parser import OCRChatParser
 from .prompts import PromptManager
 from ..core.area_detector import ChatAreaDetector
-from ..core.input_simulator import InputSimulator, focus_window_hard, send_enter
+from ..core.input_simulator import InputSimulator, focus_window_hard, send_enter, send_ctrl_enter
 from ..models.detection import AreaDetectionResult
 
 if TYPE_CHECKING:
@@ -108,6 +108,11 @@ class AgentWorkflow:
         if self.on_error:
             self.on_error(msg)
 
+    def _focus_target(self) -> None:
+        """Bring the target window to the foreground before capturing."""
+        self._input_sim.focus_window(self._window.hwnd)
+        time.sleep(0.3)
+
     def run(self) -> None:
         """Run the automation workflow."""
         self._running = True
@@ -116,7 +121,8 @@ class AgentWorkflow:
         system_msg = {"role": "system", "content": self._prompt_manager.get_system_prompt()}
         self._history = [system_msg]
 
-        # Area detection
+        # Area detection - focus window first so screenshot captures it
+        self._focus_target()
         areas = self._detect_areas()
         if areas is None:
             return
@@ -125,7 +131,12 @@ class AgentWorkflow:
         input_rect = areas.input_area_rect
         
         # Initial OCR scan
-        self._emit_status("Scanning existing conversation...")
+        if not self._reader.has_ocr():
+            self._emit_status("No OCR engine - reply detection unavailable. Install: pip install easyocr")
+            logger.warning("No OCR engine; conversation extraction will not work")
+        else:
+            self._emit_status("Scanning existing conversation...")
+        self._focus_target()
         ocr_parser = OCRChatParser(self._reader)
         initial = ocr_parser.parse_chat_area(self._window, chat_rect)
         for msg in initial:
@@ -152,8 +163,10 @@ class AgentWorkflow:
                 return
             self._window = refreshed
 
-            # Reply gate - wait for other's reply if last message is from self
-            if self._memory.is_last_message_from_self():
+            # Reply gate - wait for other's reply if last message is from self.
+            # Skip the gate on round 0 so the bot can initiate conversations
+            # and users can test the send functionality immediately.
+            if round_num > 0 and self._memory.is_last_message_from_self():
                 self._emit_status(f"Waiting for reply... (completed {round_num}/{self._rounds} rounds)")
                 new_reply = self._poll_for_reply(ocr_parser, chat_rect, round_num)
                 
@@ -195,10 +208,12 @@ class AgentWorkflow:
             
             is_first = len(self._memory) == 0
             last_other = self._memory.get_last_other_message()
+            previous_self = self._memory.get_recent_self_messages(n=5)
             user_content = self._prompt_manager.build_chat_context(
                 conversation_context=context,
                 last_other_message=last_other,
                 is_first_message=is_first,
+                previous_self_messages=previous_self,
             )
             self._history.append({"role": "user", "content": user_content})
 
@@ -243,7 +258,7 @@ class AgentWorkflow:
                 return
 
             # Send
-            self._send_message()
+            self._send_message(input_rect)
             self._emit_status(f"Round {round_num}/{self._rounds} - Sent")
             if self.on_message_sent:
                 self.on_message_sent(generated)
@@ -308,24 +323,77 @@ class AgentWorkflow:
         iy = (input_rect[1] + input_rect[3]) // 2
         self._input_sim.click_and_type(
             x=ix, y=iy, text=accumulated,
-            hwnd=self._window.hwnd, clear_first=True, move_duration=0.4
+            hwnd=self._window.hwnd,
+            win_rect=self._window.rect,
+            clear_first=True, move_duration=0.4
         )
         return accumulated
 
-    def _send_message(self) -> None:
-        """Send the typed message."""
-        focus_window_hard(self._window.hwnd)
-        time.sleep(0.1)
-        
+    def _send_message(self, input_rect: tuple[int, int, int, int] | None = None) -> None:
+        """Send the typed message by clicking the send button.
+
+        Between _generate_and_type() and this method, Qt signal emissions
+        (on_message_generated, conversation_update) cause the Liao GUI to
+        update, which steals window focus from the target app on Wayland.
+        Therefore we MUST re-focus the target window before any action, and
+        use a mouse click on the send button as the primary strategy (key
+        presses are unreliable when focus state is uncertain).
+
+        Args:
+            input_rect: Input area rectangle, used to estimate send button.
+        """
+        hwnd = self._window.hwnd
+        win_rect = self._window.rect  # (left, top, right, bottom)
+
+        # Always re-focus the target window first - critical on Wayland
+        # where the Liao GUI signal handlers can steal focus.
+        logger.debug("Send: re-focusing target window %s", hwnd)
+        self._input_sim.focus_window(hwnd)
+        time.sleep(0.3)
+
+        # Strategy 1: Click manually-set send button position (center of user-selected area)
         if self._manual_send_btn_pos:
-            self._input_sim.click_send_button(
-                *self._manual_send_btn_pos,
-                hwnd=self._window.hwnd,
-                move_duration=0.3
-            )
-        else:
-            send_enter()
-        time.sleep(0.2)
+            bx, by = self._manual_send_btn_pos
+            logger.info("Send Strategy 1: clicking manual send button center at (%d, %d)", bx, by)
+            self._input_sim.click_in_window(hwnd, win_rect[0], win_rect[1], bx, by)
+            time.sleep(0.3)
+            # Also try Enter as backup in case click didn't register
+            logger.info("Send Strategy 1: also pressing Enter as backup")
+            self._input_sim.press_key("enter")
+            time.sleep(0.2)
+            return
+
+        # Strategy 2: Click estimated send button position.
+        # In WeChat the "发送(S)" button sits at the bottom-right of the
+        # input panel.  Use click_in_window for Wayland compatibility.
+        if input_rect:
+            bx = input_rect[2] - 45   # ~45px from right edge
+            by = input_rect[3] - 15   # ~15px from bottom edge
+            logger.info("Send Strategy 2: clicking estimated send button at (%d, %d)", bx, by)
+            self._input_sim.click_in_window(hwnd, win_rect[0], win_rect[1], bx, by)
+            time.sleep(0.5)
+            logger.info("Send Strategy 2: click done, continuing to fallbacks")
+
+        # Strategy 3 & 4: Also try Enter and Ctrl+Enter as fallbacks.
+        # The window was re-focused above so these key presses should
+        # reach the target app.  Click input field center first to
+        # ensure keyboard focus is on the text widget.
+        logger.info("Send: executing Enter/Ctrl+Enter fallbacks (input_rect=%s)", input_rect is not None)
+        if input_rect:
+            ix = (input_rect[0] + input_rect[2]) // 2
+            iy = (input_rect[1] + input_rect[3]) // 2
+            logger.info("Send Strategy 3: clicking input center at (%d, %d)", ix, iy)
+            self._input_sim.click_in_window(hwnd, win_rect[0], win_rect[1], ix, iy)
+            time.sleep(0.1)
+
+        logger.info("Send Strategy 3: pressing Enter")
+        self._input_sim.press_key("enter")
+        time.sleep(0.3)
+
+        logger.info("Send Strategy 4: pressing Ctrl+Enter")
+        self._input_sim.hotkey("ctrl", "enter")
+        time.sleep(0.3)
+        logger.info("Send: all strategies completed")
 
     def _handle_no_reply(self, input_rect: tuple[int, int, int, int]) -> str:
         """Handle no-reply timeout by sending a probe."""
@@ -350,9 +418,11 @@ class AgentWorkflow:
             iy = (input_rect[1] + input_rect[3]) // 2
             self._input_sim.click_and_type(
                 x=ix, y=iy, text=response,
-                hwnd=self._window.hwnd, clear_first=True, move_duration=0.3
+                hwnd=self._window.hwnd,
+                win_rect=self._window.rect,
+                clear_first=True, move_duration=0.3
             )
-            self._send_message()
+            self._send_message(input_rect)
             return response
         except Exception as e:
             self._emit_error(f"Follow-up generation failed: {e}")
@@ -382,6 +452,7 @@ class AgentWorkflow:
                 return ""
             self._window = refreshed
             
+            self._focus_target()
             current = ocr_parser.parse_chat_area(self._window, chat_rect)
             new_others = ocr_parser.find_new_other_messages(current, self._memory)
             
@@ -395,11 +466,16 @@ class AgentWorkflow:
 
     def _is_duplicate(self, new_msg: str) -> bool:
         """Check if message is duplicate of recent self messages."""
+        # Use the enhanced duplicate detection from ConversationMemory
+        if self._memory.is_duplicate_or_similar(new_msg, threshold=0.6):
+            return True
+        
+        # Also do a simple exact match check
         clean = new_msg.strip().replace(" ", "").replace("\n", "")
         if not clean:
             return True
         
-        for msg in self._memory.messages[-6:]:
+        for msg in self._memory.messages[-10:]:
             if msg.sender == "self":
                 old = msg.content.strip().replace(" ", "").replace("\n", "")
                 if clean == old:

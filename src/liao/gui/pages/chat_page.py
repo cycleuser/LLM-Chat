@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
@@ -58,11 +59,10 @@ class ChatPage(BasePage):
         self._layout.addWidget(self._prompt_label)
         
         self._prompt_edit = QPlainTextEdit()
-        self._prompt_edit.setPlainText(
-            "You are a friendly assistant. Respond naturally and briefly (1-3 sentences), "
-            "like a real conversation. Match the other person's tone and style."
-        )
+        self._prompt_edit.setPlainText(tr("chat.prompt_default"))
         self._prompt_edit.setMaximumHeight(60)
+        self._prompt_user_modified = False
+        self._prompt_edit.textChanged.connect(self._on_prompt_changed)
         self._layout.addWidget(self._prompt_edit)
         
         # Settings row
@@ -96,6 +96,16 @@ class ChatPage(BasePage):
         settings.addWidget(self._stop_btn)
         
         self._layout.addLayout(settings)
+        
+        # Warning label for missing tools (hidden by default)
+        self._warning_label = QLabel()
+        self._warning_label.setStyleSheet(
+            "QLabel { color: #b45309; background: #fef3c7; "
+            "border: 1px solid #f59e0b; border-radius: 4px; padding: 6px; }"
+        )
+        self._warning_label.setWordWrap(True)
+        self._warning_label.setVisible(False)
+        self._layout.addWidget(self._warning_label)
         
         # Splitter for conversation and logs
         splitter = QSplitter(Qt.Vertical)
@@ -154,6 +164,11 @@ class ChatPage(BasePage):
         self._title.setText(tr("chat.title"))
         self._prompt_label.setText(tr("chat.prompt_label"))
         self._prompt_edit.setPlaceholderText(tr("chat.prompt_placeholder"))
+        # Update prompt text only if user hasn't customized it
+        if not self._prompt_user_modified:
+            self._prompt_edit.blockSignals(True)
+            self._prompt_edit.setPlainText(tr("chat.prompt_default"))
+            self._prompt_edit.blockSignals(False)
         self._rounds_label.setText(tr("chat.rounds"))
         self._max_wait_label.setText(tr("chat.max_wait"))
         self._start_btn.setText(tr("chat.start"))
@@ -176,6 +191,21 @@ class ChatPage(BasePage):
         
         can_start = mw._llm_client is not None and mw._selected_window is not None
         self._start_btn.setEnabled(can_start)
+        
+        # Show warnings for missing tools on Linux
+        warnings = []
+        if sys.platform == "linux":
+            if not mw._screenshot_reader.has_ocr():
+                warnings.append(tr("chat.warning_no_ocr"))
+            from ...core.input_simulator import InputSimulator
+            sim = InputSimulator()
+            if not sim.is_available():
+                warnings.append(tr("chat.warning_no_input"))
+        if warnings:
+            self._warning_label.setText("\n\n".join(warnings))
+            self._warning_label.setVisible(True)
+        else:
+            self._warning_label.setVisible(False)
     
     def _on_start(self) -> None:
         """Start auto chat automation."""
@@ -257,6 +287,10 @@ class ChatPage(BasePage):
         scrollbar = self._log_display.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
     
+    def _on_prompt_changed(self) -> None:
+        """Track when user manually edits the prompt."""
+        self._prompt_user_modified = True
+    
     def _on_manual_send(self) -> None:
         """Send manual message."""
         mw = self.main_window
@@ -266,7 +300,8 @@ class ChatPage(BasePage):
         
         self._manual_edit.clear()
         
-        from ...core.input_simulator import click_and_type, send_enter, focus_window_hard
+        import time as _time
+        from ...core.input_simulator import InputSimulator
         
         input_rect = mw._manual_input_rect
         if not input_rect and mw._detected_areas:
@@ -278,10 +313,33 @@ class ChatPage(BasePage):
             cy = w.rect[3] - 100
             input_rect = (cx - 100, cy - 20, cx + 100, cy + 20)
         
-        focus_window_hard(mw._selected_window.hwnd)
+        hwnd = mw._selected_window.hwnd
+        win_rect = mw._selected_window.rect
+        sim = InputSimulator()
+        
         cx = (input_rect[0] + input_rect[2]) // 2
         cy = (input_rect[1] + input_rect[3]) // 2
-        click_and_type(cx, cy, text)
-        send_enter()
+        sim.click_and_type(cx, cy, text, hwnd=hwnd, win_rect=win_rect)
+
+        # Re-focus target window (Liao GUI updates may steal focus)
+        _time.sleep(0.2)
+        sim.focus_window(hwnd)
+        _time.sleep(0.3)
+
+        if mw._manual_send_btn_pos:
+            bx, by = mw._manual_send_btn_pos
+            sim.click_in_window(hwnd, win_rect[0], win_rect[1], bx, by)
+        else:
+            # Click estimated send button (bottom-right of input area)
+            bx = input_rect[2] - 45
+            by = input_rect[3] - 15
+            sim.click_in_window(hwnd, win_rect[0], win_rect[1], bx, by)
+            _time.sleep(0.3)
+            # Also try Enter and Ctrl+Enter as fallbacks
+            sim.click_in_window(hwnd, win_rect[0], win_rect[1], cx, cy)
+            _time.sleep(0.1)
+            sim.press_key("enter")
+            _time.sleep(0.3)
+            sim.hotkey("ctrl", "enter")
         
         self._log(f"[Manual] Sent: {text}")

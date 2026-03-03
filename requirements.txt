@@ -1,0 +1,39 @@
+# ============================================================
+# Liao - Cross-platform requirements
+# ============================================================
+#
+# Installation:
+#   pip install -r requirements.txt
+#
+# For OCR support, also install one of:
+#   pip install easyocr           # Best quality, requires torch
+#   pip install rapidocr-onnxruntime  # Lightweight (Python <3.13)
+#   pip install pytesseract       # Universal fallback
+#
+# Platform-specific requirements:
+#   - Windows: pywin32 (auto-installed)
+#   - Linux: see requirements-linux.txt for system packages
+# ============================================================
+
+# --- Core dependencies ---
+PySide6>=6.4.0
+requests>=2.28.0
+Pillow>=9.3.0
+numpy>=1.24.0
+pyperclip>=1.8.2
+pyautogui>=0.9.53
+
+# --- Windows-specific (auto-skipped on other platforms) ---
+pywin32>=305; sys_platform == "win32"
+
+# --- OCR (choose one based on your needs) ---
+# Uncomment ONE of the following:
+
+# Option 1: EasyOCR - Best quality, but heavy (requires PyTorch ~2GB)
+# easyocr>=1.6.2
+
+# Option 2: RapidOCR - Lightweight and fast (Python <3.13 only)
+rapidocr-onnxruntime>=1.2.0; python_version < "3.13"
+
+# Option 3: pytesseract - Universal fallback (requires tesseract binary)
+pytesseract>=0.3.10

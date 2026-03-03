@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import re
+from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..models.message import ChatMessage
@@ -10,11 +14,20 @@ if TYPE_CHECKING:
     pass
 
 
+def _get_conversations_dir() -> Path:
+    """Get the conversations directory, creating it if needed."""
+    home = Path.home()
+    conv_dir = home / ".liao" / "conversations"
+    conv_dir.mkdir(parents=True, exist_ok=True)
+    return conv_dir
+
+
 class ConversationMemory:
     """Structured conversation memory with sender attribution.
     
     Maintains a history of chat messages with proper sender tracking
     and formatting utilities for LLM consumption and display.
+    Supports persistence to markdown files.
     
     Example:
         memory = ConversationMemory(contact_name="Alice")
@@ -24,13 +37,16 @@ class ConversationMemory:
         # Format for LLM
         context = memory.format_for_llm()
         
-        # Format for display
-        html = memory.format_for_display_html()
+        # Save to file
+        memory.save_to_file()
     """
 
-    def __init__(self, contact_name: str = "Other"):
+    def __init__(self, contact_name: str = "Other", session_id: str | None = None):
         self._contact_name = contact_name
         self._messages: list[ChatMessage] = []
+        self._session_id = session_id or datetime.now().strftime("%Y%m%d_%H%M%S")
+        self._file_path: Path | None = None
+        self._sent_messages: set[str] = set()  # Track sent messages to avoid repeats
 
     @property
     def contact_name(self) -> str:
@@ -47,6 +63,11 @@ class ConversationMemory:
         """Get all messages."""
         return self._messages
 
+    @property
+    def session_id(self) -> str:
+        """Get session ID."""
+        return self._session_id
+
     def add_self_message(self, content: str, msg_type: str = "text") -> None:
         """Add a message from self.
         
@@ -59,6 +80,8 @@ class ConversationMemory:
             content=content,
             msg_type=msg_type,
         ))
+        self._sent_messages.add(self._normalize_for_comparison(content))
+        self._auto_save()
 
     def add_other_message(self, content: str, msg_type: str = "text") -> None:
         """Add a message from the other party.
@@ -72,6 +95,58 @@ class ConversationMemory:
             content=content,
             msg_type=msg_type,
         ))
+        self._auto_save()
+
+    def _normalize_for_comparison(self, text: str) -> str:
+        """Normalize text for similarity comparison."""
+        # Remove punctuation, lowercase, remove extra spaces
+        text = re.sub(r'[^\w\s]', '', text.lower())
+        return ' '.join(text.split())
+
+    def is_duplicate_or_similar(self, content: str, threshold: float = 0.7) -> bool:
+        """Check if content is too similar to previous self messages.
+        
+        Args:
+            content: Message to check
+            threshold: Similarity threshold (0-1)
+            
+        Returns:
+            True if content is duplicate or too similar
+        """
+        normalized = self._normalize_for_comparison(content)
+        
+        # Exact match
+        if normalized in self._sent_messages:
+            return True
+        
+        # Check similarity with recent self messages (last 10)
+        recent_self = [m.content for m in self._messages[-20:] if m.sender == "self"]
+        for prev in recent_self:
+            prev_norm = self._normalize_for_comparison(prev)
+            # Simple similarity: check if one contains most of the other
+            if len(normalized) > 0 and len(prev_norm) > 0:
+                # Check overlap
+                if normalized in prev_norm or prev_norm in normalized:
+                    return True
+                # Check word overlap
+                words1 = set(normalized.split())
+                words2 = set(prev_norm.split())
+                if words1 and words2:
+                    overlap = len(words1 & words2) / max(len(words1), len(words2))
+                    if overlap >= threshold:
+                        return True
+        return False
+
+    def get_recent_self_messages(self, n: int = 5) -> list[str]:
+        """Get the n most recent self messages for context.
+        
+        Args:
+            n: Number of messages to return
+            
+        Returns:
+            List of message contents
+        """
+        return [m.content for m in self._messages if m.sender == "self"][-n:]
 
     def format_for_llm(self, max_messages: int = 20) -> str:
         """Format conversation for LLM with highlighted latest exchange.
@@ -206,6 +281,126 @@ class ConversationMemory:
     def clear(self) -> None:
         """Clear all messages."""
         self._messages.clear()
+        self._sent_messages.clear()
 
     def __len__(self) -> int:
         return len(self._messages)
+
+    def _get_file_path(self) -> Path:
+        """Get the file path for this conversation."""
+        if self._file_path is None:
+            conv_dir = _get_conversations_dir()
+            safe_name = re.sub(r'[^\w\-]', '_', self._contact_name)[:20]
+            filename = f"{self._session_id}_{safe_name}.md"
+            self._file_path = conv_dir / filename
+        return self._file_path
+
+    def _auto_save(self) -> None:
+        """Auto-save after each message."""
+        try:
+            self.save_to_file()
+        except Exception:
+            pass  # Silent fail for auto-save
+
+    def save_to_file(self) -> Path:
+        """Save conversation to markdown file.
+        
+        Returns:
+            Path to the saved file
+        """
+        path = self._get_file_path()
+        
+        lines = [
+            f"# Conversation with {self._contact_name}",
+            f"",
+            f"**Session**: {self._session_id}",
+            f"**Started**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"**Messages**: {len(self._messages)}",
+            f"",
+            "---",
+            "",
+        ]
+        
+        for m in self._messages:
+            sender = "**Me**" if m.sender == "self" else f"**{self._contact_name}**"
+            content = m.content.replace("\n", "\n> ")
+            if m.msg_type != "text":
+                content = f"[{m.msg_type}]"
+            lines.append(f"{sender}:")
+            lines.append(f"> {content}")
+            lines.append("")
+        
+        path.write_text("\n".join(lines), encoding="utf-8")
+        return path
+
+    def load_from_file(self, path: Path | str) -> bool:
+        """Load conversation from markdown file.
+        
+        Args:
+            path: Path to the markdown file
+            
+        Returns:
+            True if loaded successfully
+        """
+        path = Path(path)
+        if not path.exists():
+            return False
+        
+        try:
+            content = path.read_text(encoding="utf-8")
+            self._messages.clear()
+            self._sent_messages.clear()
+            
+            # Parse markdown format
+            current_sender = None
+            current_content = []
+            
+            for line in content.split("\n"):
+                if line.startswith("**Me**:"):
+                    if current_sender and current_content:
+                        msg = "\n".join(current_content).strip()
+                        if current_sender == "self":
+                            self._messages.append(ChatMessage(sender="self", content=msg))
+                            self._sent_messages.add(self._normalize_for_comparison(msg))
+                        else:
+                            self._messages.append(ChatMessage(sender="other", content=msg))
+                    current_sender = "self"
+                    current_content = []
+                elif line.startswith("**") and line.endswith("**:"):
+                    if current_sender and current_content:
+                        msg = "\n".join(current_content).strip()
+                        if current_sender == "self":
+                            self._messages.append(ChatMessage(sender="self", content=msg))
+                            self._sent_messages.add(self._normalize_for_comparison(msg))
+                        else:
+                            self._messages.append(ChatMessage(sender="other", content=msg))
+                    current_sender = "other"
+                    current_content = []
+                elif line.startswith("> ") and current_sender:
+                    current_content.append(line[2:])
+            
+            # Handle last message
+            if current_sender and current_content:
+                msg = "\n".join(current_content).strip()
+                if current_sender == "self":
+                    self._messages.append(ChatMessage(sender="self", content=msg))
+                    self._sent_messages.add(self._normalize_for_comparison(msg))
+                else:
+                    self._messages.append(ChatMessage(sender="other", content=msg))
+            
+            self._file_path = path
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
+    def list_saved_conversations() -> list[Path]:
+        """List all saved conversation files.
+        
+        Returns:
+            List of conversation file paths, newest first
+        """
+        conv_dir = _get_conversations_dir()
+        files = list(conv_dir.glob("*.md"))
+        files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        return files

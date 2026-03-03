@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+import sys
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt, Slot
+from PySide6.QtCore import Qt, Slot, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -35,6 +36,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+IS_LINUX = sys.platform == "linux"
+
 
 class MainWindow(QMainWindow):
     """Main application window with multi-page wizard interface."""
@@ -62,6 +65,34 @@ class MainWindow(QMainWindow):
         self._build_menu()
         self._update_ui_text()
         self._update_navigation()
+        
+        # Request screen permission on Linux after window is shown
+        if IS_LINUX:
+            QTimer.singleShot(500, self._request_screen_permission)
+
+    def _request_screen_permission(self) -> None:
+        """Request screen capture permission on Linux/Wayland."""
+        if self._screenshot_reader.has_screen_permission():
+            logger.info("Screen capture permission already granted")
+            return
+        
+        # Show info dialog before permission request
+        QMessageBox.information(
+            self,
+            tr("dialog.screen_permission_title"),
+            tr("dialog.screen_permission_text"),
+        )
+        
+        # Request permission (this triggers the Wayland portal dialog)
+        if self._screenshot_reader.request_screen_permission():
+            logger.info("Screen capture permission granted")
+        else:
+            logger.warning("Screen capture permission denied or failed")
+            QMessageBox.warning(
+                self,
+                tr("dialog.screen_permission_title"),
+                tr("dialog.screen_permission_failed"),
+            )
 
     def _build_menu(self) -> None:
         """Build menu bar."""

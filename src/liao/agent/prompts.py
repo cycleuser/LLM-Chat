@@ -18,9 +18,16 @@ Never send two consecutive messages - always wait for their reply before speakin
 3. Match your reply length to theirs: short replies for short messages, longer for longer
 4. Match their tone: enthusiastic if they are, reserved if they are
 5. If they asked a question, prioritize answering it
-6. Never repeat what you said before
+6. CRITICAL: Never repeat what you said before - each message must be unique and fresh
 7. Don't make up non-existent information (fake book titles, movies, names, etc.)
 8. Stay on topic: always respond to what they said, don't suddenly change subjects
+9. Don't be a "repeater" - never echo back their words or say what they already said
+
+【Anti-Repetition Rules】
+- NEVER repeat any previous message you sent, even paraphrased
+- NEVER repeat what the other party just said back to them
+- If you already said something similar, say something completely different
+- Check the conversation history and avoid any overlap with your previous messages
 
 【Format Requirements】
 - Output only the message content directly
@@ -37,7 +44,8 @@ Don't repeat previous content or confuse who said what.
 【Pre-send Check】
 Before generating, confirm:
 - This directly responds to Other's latest message
-- Not repeating anything said before
+- Not repeating anything I said before (check ALL my previous messages)
+- Not echoing back what Other just said
 - Not making up non-existent information
 - No "Me:" or other prefix added
 - Length and tone match their message
@@ -123,6 +131,7 @@ class PromptManager:
         conversation_context: str,
         last_other_message: str | None = None,
         is_first_message: bool = False,
+        previous_self_messages: list[str] | None = None,
     ) -> str:
         """Build the user message content for LLM.
         
@@ -130,6 +139,7 @@ class PromptManager:
             conversation_context: Formatted conversation history
             last_other_message: Most recent message from other party
             is_first_message: Whether this is the first message
+            previous_self_messages: Recent messages sent by self (for anti-repetition)
             
         Returns:
             Formatted prompt for LLM
@@ -138,10 +148,22 @@ class PromptManager:
             return self.get_first_message_prompt()
         
         if last_other_message:
-            return (
-                f"{conversation_context}\n\n"
-                f"Please respond naturally to what they said: \"{last_other_message}\"\n"
-                f"Requirements: Directly respond to their message, stay on topic, don't repeat previous content."
-            )
+            parts = [conversation_context, ""]
+            
+            # Add anti-repetition reminder with previous messages
+            if previous_self_messages:
+                parts.append("【DO NOT REPEAT - My previous messages were:】")
+                for i, msg in enumerate(previous_self_messages[-5:], 1):
+                    parts.append(f"{i}. \"{msg}\"")
+                parts.append("")
+            
+            parts.append(f"Please respond naturally to what they said: \"{last_other_message}\"")
+            parts.append("Requirements:")
+            parts.append("- Directly respond to their message")
+            parts.append("- Stay on topic")
+            parts.append("- Say something NEW - do NOT repeat or paraphrase any of my previous messages above")
+            parts.append("- Do NOT echo back what they said")
+            
+            return "\n".join(parts)
         
         return self.get_first_message_prompt()
