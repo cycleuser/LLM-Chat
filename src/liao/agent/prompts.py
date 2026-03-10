@@ -22,12 +22,27 @@ Never send two consecutive messages - always wait for their reply before speakin
 7. Don't make up non-existent information (fake book titles, movies, names, etc.)
 8. Stay on topic: always respond to what they said, don't suddenly change subjects
 9. Don't be a "repeater" - never echo back their words or say what they already said
+10. If knowledge base content is provided, use it as reference but keep conversational tone
 
 【Anti-Repetition Rules】
 - NEVER repeat any previous message you sent, even paraphrased
 - NEVER repeat what the other party just said back to them
 - If you already said something similar, say something completely different
 - Check the conversation history and avoid any overlap with your previous messages
+
+【Recovery & Flexibility】
+- If you're unsure how to respond, ask a clarifying question naturally
+- If the conversation stalls, gently shift to a related topic
+- If you made an error, acknowledge it briefly and move on
+- When they seem confused, offer to explain in more detail or rephrase
+- Be adaptable - real conversations aren't always perfect
+
+【Explanation Control】
+- Only explain when asked or when the topic clearly requires it
+- Ask first: "Want me to explain more?" instead of launching into long explanations
+- Keep explanations brief unless they request details
+- Use "I can explain more if you'd like" instead of assuming they want it
+- Match their engagement level - if they ask short questions, give short answers
 
 【Format Requirements】
 - Output only the message content directly
@@ -49,6 +64,7 @@ Before generating, confirm:
 - Not making up non-existent information
 - No "Me:" or other prefix added
 - Length and tone match their message
+- If explaining: did they ask for it? If not, consider asking first
 
 【User Settings】
 {user_prompt}
@@ -68,13 +84,39 @@ Requirements: Short, friendly, like a casual chat opener. Output only the messag
 AUTO_CHAT_NO_REPLY_PROMPT = """\
 The other party hasn't replied for {wait_seconds} seconds.
 
-Review the recent conversation, then choose:
-1. If they might still be thinking (e.g., you asked something requiring thought), output WAIT
-2. If a natural follow-up is appropriate (8 characters max, like "Still there?" or "What do you think?"), output it directly
-3. Don't rush or appear impatient
+Review the recent conversation context, then choose ONE option:
 
-Output your choice directly (WAIT or a short follow-up, no prefix):
+【Option 1: WAIT】 - Output just "WAIT" if:
+- You just asked a question that needs thought
+- The topic seems to need consideration
+- Recent exchange was substantial
+
+【Option 2: Gentle nudge (max 10 chars)】 if:
+- Conversation was light and could continue
+- A simple follow-up makes sense
+- They might have gotten distracted
+
+Examples of good nudges:
+- "还在吗？" (Still there?)
+- "你觉得呢？" (What do you think?)
+- "嗯？" (Hmm?)
+
+【Option 3: Fresh topic starter (max 12 chars)】 if:
+- Current topic seems exhausted
+- Long pause suggests they want to switch
+- A light subject change would help
+
+Requirements:
+- Don't sound impatient or demanding
+- Match the tone of your last message
+- Keep it natural and friendly
+- Never apologize excessively
+
+Output your choice directly (WAIT or the message content, no prefix):
 """
+
+# Refusal message for strict KB mode when no results found
+KB_STRICT_REFUSAL = "I'm sorry, I don't have relevant information in my knowledge base to answer this question."
 
 
 class PromptManager:
@@ -132,6 +174,7 @@ class PromptManager:
         last_other_message: str | None = None,
         is_first_message: bool = False,
         previous_self_messages: list[str] | None = None,
+        kb_context: str | None= None,
     ) -> str:
         """Build the user message content for LLM.
         
@@ -139,7 +182,8 @@ class PromptManager:
             conversation_context: Formatted conversation history
             last_other_message: Most recent message from other party
             is_first_message: Whether this is the first message
-            previous_self_messages: Recent messages sent by self (for anti-repetition)
+           previous_self_messages: Recent messages sent by self (for anti-repetition)
+            kb_context: Optional knowledge base context to include as reference
             
         Returns:
             Formatted prompt for LLM
@@ -148,7 +192,19 @@ class PromptManager:
             return self.get_first_message_prompt()
         
         if last_other_message:
-            parts = [conversation_context, ""]
+            parts = []
+
+            # Inject KB context if available
+            if kb_context:
+                parts.append("【Reference Knowledge Base Content】")
+                parts.append(kb_context)
+                parts.append("")
+                parts.append("Please use the above reference material to inform your response where relevant.")
+                parts.append("---")
+                parts.append("")
+
+            parts.append(conversation_context)
+            parts.append("")
             
             # Add anti-repetition reminder with previous messages
             if previous_self_messages:

@@ -43,6 +43,7 @@ class AutoChatWorker(QThread):
     error_occurred = Signal(str)
     round_completed = Signal(int)
     conversation_log = Signal(str)
+    kb_status = Signal(str)
 
     def __init__(
         self,
@@ -57,6 +58,9 @@ class AutoChatWorker(QThread):
         manual_chat_rect: tuple[int, int, int, int] | None = None,
         manual_input_rect: tuple[int, int, int, int] | None = None,
         manual_send_btn_pos: tuple[int, int] | None = None,
+        kb_config: dict | None = None,
+        selected_kbs: list[str] | None = None,
+        strict_mode: bool = False,
     ):
         super().__init__()
         self._client = llm_client
@@ -70,6 +74,9 @@ class AutoChatWorker(QThread):
         self._manual_chat_rect = manual_chat_rect
         self._manual_input_rect = manual_input_rect
         self._manual_send_btn_pos = manual_send_btn_pos
+        self._kb_config = kb_config
+        self._selected_kbs = selected_kbs
+        self._strict_mode = strict_mode
         self._workflow: AgentWorkflow | None = None
 
     def stop(self) -> None:
@@ -91,6 +98,9 @@ class AutoChatWorker(QThread):
             manual_chat_rect=self._manual_chat_rect,
             manual_input_rect=self._manual_input_rect,
             manual_send_btn_pos=self._manual_send_btn_pos,
+            kb_config=self._kb_config,
+            selected_kbs=self._selected_kbs,
+            strict_mode=self._strict_mode,
         )
         
         # Connect callbacks to signals
@@ -102,6 +112,7 @@ class AutoChatWorker(QThread):
         self._workflow.on_error = lambda e: self.error_occurred.emit(e)
         self._workflow.on_round_complete = lambda n: self.round_completed.emit(n)
         self._workflow.on_conversation_update = lambda h: self.conversation_log.emit(h)
+        self._workflow.on_kb_status = lambda m: self.kb_status.emit(m)
         
         # Run workflow
         try:

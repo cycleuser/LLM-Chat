@@ -6,6 +6,8 @@
     "menu": {
         "file": "文件",
         "exit": "退出",
+       "tools": "工具",
+       "kb_settings": "知识库设置",
         "language": "语言",
         "help": "帮助",
         "about": "关于"
@@ -18,6 +20,7 @@
         "step_connection": "连接",
         "step_window": "窗口",
         "step_area": "区域",
+        "step_kb": "知识库",
         "step_chat": "对话"
     },
     "connection": {
@@ -82,7 +85,11 @@
         "conversation": "对话",
         "log": "日志",
         "warning_no_ocr": "未找到OCR引擎，回复识别将不可用。\n安装: pip install easyocr",
-        "warning_no_input": "未找到xdotool，输入模拟已禁用。\n安装: sudo apt install xdotool\n安装后请重启Liao。"
+        "warning_no_input": "未找到xdotool，输入模拟已禁用。\n安装: sudo apt install xdotool\n安装后请重启Liao。",
+        "strict_mode": "严格知识库模式",
+        "kb_searching": "正在搜索知识库...",
+        "kb_no_results": "未找到相关知识库内容",
+        "kb_language_detected": "知识库语言：{lang}"
     },
     "manual": {
         "title": "快速发送:",
@@ -116,5 +123,44 @@
         "screen_permission_title": "屏幕捕获权限",
         "screen_permission_text": "聊 需要屏幕捕获权限来读取聊天消息。\n\n系统将弹出授权对话框，请选择您的屏幕并点击「共享」。",
         "screen_permission_failed": "未获得屏幕捕获权限。\n\n没有此权限，聊 无法截取屏幕来读取聊天消息。\n\n请重启应用并在提示时授予权限。"
+    },
+    "kb": {
+        "enable_kb": "启用知识库",
+        "connection_settings": "连接设置",
+        "chroma_dir_label": "ChromaDB 目录:",
+        "browse": "浏览",
+        "embedding_model": "嵌入模型:",
+        "ollama_url": "Ollama 地址:",
+        "select_kbs": "选择知识库",
+        "refresh_kbs": "刷新知识库列表",
+        "strict_mode_settings": "严格模式",
+        "enable_strict_mode": "启用严格知识库模式",
+        "strict_mode_description": "启用后，当知识库中没有相关内容时，聊 将拒绝回答问题。这确保了准确性但可能限制回复。",
+        "test_connection": "测试连接",
+        "import_from_gangdan": "从 GangDan 导入",
+        "use_kb": "使用知识库",
+        "more_options": "更多选项...",
+        "disabled": "知识库已禁用",
+        "searching_all": "搜索所有知识库",
+        "select_multiple_instructions": "选择一个或多个知识库进行搜索。按住 Ctrl/Cmd 可多选。",
+        "upload_documents": "上传文档到知识库",
+        "upload_instructions": "添加 Markdown (.md) 或文本 (.txt) 文件以上传并索引到知识库。",
+        "add_files": "添加文件",
+        "add_directory": "添加目录",
+        "remove_selected": "移除选中",
+        "chunk_size": "分块大小:",
+        "chunk_overlap": "重叠:",
+        "upload_and_index": "上传并索引",
+        "cancel": "取消",
+        "select_files": "选择要上传的文件",
+        "file_filter": "Markdown 和文本文件 (*.md *.txt);;所有文件 (*)",
+        "select_directory": "选择要导入的目录",
+        "indexing_in_progress": "正在索引文档...",
+        "select_chroma_dir": "选择 ChromaDB 目录"
+    },
+    "kb_page": {
+        "title": "知识库设置",
+        "subtitle": "可选：配置知识库以增强对话效果（RAG）。可以跳过此步骤。",
+        "upload_documents": "上传文档"
     }
 }

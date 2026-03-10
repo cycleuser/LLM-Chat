@@ -6,6 +6,8 @@
     "menu": {
         "file": "File",
         "exit": "Exit",
+       "tools": "Tools",
+       "kb_settings": "Knowledge Base Settings",
         "language": "Language",
         "help": "Help",
         "about": "About"
@@ -18,6 +20,7 @@
         "step_connection": "Connection",
         "step_window": "Window",
         "step_area": "Area",
+        "step_kb": "Knowledge Base",
         "step_chat": "Chat"
     },
     "connection": {
@@ -82,7 +85,11 @@
         "conversation": "Conversation",
         "log": "Log",
         "warning_no_ocr": "No OCR engine found. Reply detection will not work.\nInstall: pip install easyocr",
-        "warning_no_input": "xdotool not found. Input simulation is disabled.\nInstall: sudo apt install xdotool\nThen restart Liao."
+        "warning_no_input": "xdotool not found. Input simulation is disabled.\nInstall: sudo apt install xdotool\nThen restart Liao.",
+        "strict_mode": "Strict KB Mode",
+        "kb_searching": "Searching knowledge base...",
+        "kb_no_results": "No relevant KB content found",
+        "kb_language_detected": "KB language: {lang}"
     },
     "manual": {
         "title": "Quick Send:",
@@ -116,5 +123,44 @@
         "screen_permission_title": "Screen Capture Permission",
         "screen_permission_text": "Liao needs screen capture permission to read chat messages.\n\nA system dialog will appear. Please select your screen and click Share.",
         "screen_permission_failed": "Screen capture permission was not granted.\n\nWithout this permission, Liao cannot capture screenshots to read chat messages.\n\nPlease restart the application and grant permission when prompted."
+    },
+    "kb": {
+        "enable_kb": "Enable Knowledge Base",
+        "connection_settings": "Connection Settings",
+        "chroma_dir_label": "ChromaDB Directory:",
+        "browse": "Browse",
+        "embedding_model": "Embedding Model:",
+        "ollama_url": "Ollama URL:",
+        "select_kbs": "Select Knowledge Bases",
+        "refresh_kbs": "Refresh KB List",
+        "strict_mode_settings": "Strict Mode",
+        "enable_strict_mode": "Enable Strict KB Mode",
+        "strict_mode_description": "When enabled, Liao will refuse to answer questions if no relevant knowledge base content is found. This ensures accuracy but may limit responses.",
+        "test_connection": "Test Connection",
+        "import_from_gangdan": "Import from GangDan",
+        "use_kb": "Use KB",
+        "more_options": "More Options...",
+        "disabled": "KB Disabled",
+        "searching_all": "Searching all KBs",
+        "select_multiple_instructions": "Select one or more knowledge bases to search. Hold Ctrl/Cmd to select multiple.",
+        "upload_documents": "Upload Documents to KB",
+        "upload_instructions": "Add markdown (.md) or text (.txt) files to upload and index into the knowledge base.",
+        "add_files": "Add Files",
+        "add_directory": "Add Directory",
+        "remove_selected": "Remove Selected",
+        "chunk_size": "Chunk Size:",
+        "chunk_overlap": "Overlap:",
+        "upload_and_index": "Upload & Index",
+        "cancel": "Cancel",
+        "select_files": "Select Files to Upload",
+        "file_filter": "Markdown & Text Files (*.md *.txt);;All Files (*)",
+        "select_directory": "Select Directory to Import",
+        "indexing_in_progress": "Indexing documents in progress...",
+        "select_chroma_dir": "Select ChromaDB Directory"
+    },
+    "kb_page": {
+        "title": "Knowledge Base Setup",
+        "subtitle": "Optionally configure a knowledge base for RAG-enhanced conversations. You can skip this step.",
+        "upload_documents": "Upload Documents"
     }
 }

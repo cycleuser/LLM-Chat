@@ -21,14 +21,15 @@ class ProgressIndicator(QWidget):
             tr("progress.step_connection"),
             tr("progress.step_window"),
             tr("progress.step_area"),
+            tr("progress.step_kb"),
             tr("progress.step_chat"),
         ]
         self.setMinimumHeight(60)
         self.setMaximumHeight(70)
     
     def set_current_step(self, step: int) -> None:
-        """Set the current active step (0-3)."""
-        if 0 <= step <= 3:
+        """Set the current active step (0-4)."""
+        if 0 <= step <= 4:
             self._current_step = step
             self.update()
     
@@ -42,6 +43,7 @@ class ProgressIndicator(QWidget):
             tr("progress.step_connection"),
             tr("progress.step_window"),
             tr("progress.step_area"),
+            tr("progress.step_kb"),
             tr("progress.step_chat"),
         ]
         self.update()
@@ -62,7 +64,7 @@ class ProgressIndicator(QWidget):
         width = self.width()
         height = self.height()
         
-        n_steps = 4
+        n_steps = 5
         margin = 80
         available_width = width - 2 * margin
         step_width = available_width / (n_steps - 1)
@@ -136,10 +138,10 @@ class ProgressIndicator(QWidget):
         width = self.width()
         margin = 80
         available_width = width - 2 * margin
-        step_width = available_width / 3
+        step_width = available_width / 4
         
         click_x = event.pos().x()
-        for i in range(4):
+        for i in range(5):
             x = margin + i * step_width
             if abs(click_x - x) < 30:
                 self.step_clicked.emit(i)

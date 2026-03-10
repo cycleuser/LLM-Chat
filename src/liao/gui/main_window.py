@@ -28,7 +28,7 @@ from ..models.detection import AreaDetectionResult
 from .overlay import AreaSelectionOverlay
 from .workers import AutoChatWorker
 from .i18n import tr, set_locale
-from .pages import ConnectionPage, WindowPage, AreaPage, ChatPage
+from .pages import ConnectionPage, WindowPage, AreaPage, KBPage, ChatPage
 from .widgets import ProgressIndicator
 
 if TYPE_CHECKING:
@@ -58,6 +58,7 @@ class MainWindow(QMainWindow):
         self._manual_send_btn_pos: tuple[int, int] | None = None
         self._overlay: AreaSelectionOverlay | None = None
         self._selecting_purpose = ""
+        self._kb_config: dict | None = None
         
         self._current_page = 0
         
@@ -100,9 +101,11 @@ class MainWindow(QMainWindow):
         menubar.clear()
         
         file_menu = menubar.addMenu(tr("menu.file"))
-        exit_action = QAction(tr("menu.exit"), self)
+        exit_action= QAction(tr("menu.exit"), self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
+        
+        
         
         lang_menu = menubar.addMenu(tr("menu.language"))
         en_action = QAction("English", self)
@@ -117,11 +120,6 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
 
-    def _change_language(self, locale: str) -> None:
-        """Change UI language."""
-        set_locale(locale)
-        self._update_ui_text()
-        self._build_menu()
 
     def _update_ui_text(self) -> None:
         """Update all UI text with current translations."""
@@ -132,6 +130,7 @@ class MainWindow(QMainWindow):
         self._connection_page.update_translations()
         self._window_page.update_translations()
         self._area_page.update_translations()
+        self._kb_page.update_translations()
         self._chat_page.update_translations()
 
     def _build_ui(self) -> None:
@@ -144,7 +143,7 @@ class MainWindow(QMainWindow):
 
         # Progress indicator
         self._progress = ProgressIndicator()
-        self._progress.setFixedHeight(70)
+        self._progress.setFixedHeight(100)
         root.addWidget(self._progress)
         
         # Stacked widget for pages
@@ -153,11 +152,13 @@ class MainWindow(QMainWindow):
         self._connection_page = ConnectionPage(self)
         self._window_page = WindowPage(self)
         self._area_page = AreaPage(self)
+        self._kb_page = KBPage(self)
         self._chat_page = ChatPage(self)
         
         self._stack.addWidget(self._connection_page)
         self._stack.addWidget(self._window_page)
         self._stack.addWidget(self._area_page)
+        self._stack.addWidget(self._kb_page)
         self._stack.addWidget(self._chat_page)
         
         root.addWidget(self._stack, 1)
@@ -188,12 +189,12 @@ class MainWindow(QMainWindow):
         
         root.addLayout(nav_layout)
         
-        self.resize(800, 700)
-        self.setMinimumSize(700, 600)
+        self.resize(700, 900)
+        self.setMinimumSize(700, 800)
 
     def _go_to_page(self, index: int) -> None:
         """Navigate to a specific page."""
-        if index < 0 or index > 3:
+        if index < 0 or index > 4:
             return
         
         current_widget = self._stack.currentWidget()
@@ -220,7 +221,7 @@ class MainWindow(QMainWindow):
         current_widget = self._stack.currentWidget()
         if hasattr(current_widget, 'is_valid') and not current_widget.is_valid():
             return
-        if self._current_page < 3:
+        if self._current_page < 4:
             self._go_to_page(self._current_page + 1)
 
     def _update_navigation(self) -> None:
@@ -232,7 +233,7 @@ class MainWindow(QMainWindow):
         if hasattr(current_widget, 'is_valid'):
             is_valid = current_widget.is_valid()
         
-        self._next_btn.setVisible(self._current_page < 3)
+        self._next_btn.setVisible(self._current_page < 4)
         self._next_btn.setEnabled(is_valid)
         self._status_label.setText(tr("status.ready"))
 
@@ -306,3 +307,9 @@ class MainWindow(QMainWindow):
             tr("dialog.about_title"),
             tr("dialog.about_text", version=__version__)
         )
+
+    def _change_language(self, locale_code: str) -> None:
+        """Switch UI language."""
+        set_locale(locale_code)
+        self._build_menu()
+        self._update_ui_text()

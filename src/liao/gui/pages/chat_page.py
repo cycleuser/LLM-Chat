@@ -66,42 +66,70 @@ class ChatPage(BasePage):
         self._prompt_edit.textChanged.connect(self._on_prompt_changed)
         self._layout.addWidget(self._prompt_edit)
         
-        # Settings row
-        settings = QHBoxLayout()
-        settings.setSpacing(15)
+        # Settings section - two rows for better organization
+        settings_layout = QVBoxLayout()
+        settings_layout.setSpacing(8)
+        
+        # Row 1: Automation settings
+        row1 = QHBoxLayout()
+        row1.setSpacing(12)
         
         # Unlimited rounds checkbox
         self._unlimited_check = QCheckBox()
         self._unlimited_check.stateChanged.connect(self._on_unlimited_changed)
-        settings.addWidget(self._unlimited_check)
+        row1.addWidget(self._unlimited_check)
         
         self._rounds_label = QLabel()
-        settings.addWidget(self._rounds_label)
+        row1.addWidget(self._rounds_label)
         self._rounds_spin = QSpinBox()
         self._rounds_spin.setRange(1, 100)
         self._rounds_spin.setValue(5)
-        settings.addWidget(self._rounds_spin)
+        row1.addWidget(self._rounds_spin)
         
         self._max_wait_label = QLabel()
-        settings.addWidget(self._max_wait_label)
+        row1.addWidget(self._max_wait_label)
         self._max_wait_spin = QSpinBox()
         self._max_wait_spin.setRange(5, 300)
         self._max_wait_spin.setValue(60)
-        settings.addWidget(self._max_wait_spin)
+        row1.addWidget(self._max_wait_spin)
         
-        settings.addStretch()
+        row1.addStretch()
+        settings_layout.addLayout(row1)
+        
+        # Row 2: KB settings and action buttons
+        row2 = QHBoxLayout()
+        row2.setSpacing(12)
+        
+        # KB selector widget (if available)
+        try:
+            from ..widgets import KBSelectorWidget
+            self._kb_selector = KBSelectorWidget()
+            self._kb_selector.kb_selection_changed.connect(self._on_kb_selection_changed)
+            row2.addWidget(self._kb_selector)
+        except ImportError:
+            self._kb_selector = None
+        
+        # Strict KB mode checkbox
+        self._strict_mode_check = QCheckBox()
+        self._strict_mode_check.setVisible(False)
+        row2.addWidget(self._strict_mode_check)
+        
+        row2.addStretch()
         
         # Action buttons
         self._start_btn = QPushButton()
+        self._start_btn.setMinimumWidth(100)
         self._start_btn.clicked.connect(self._on_start)
-        settings.addWidget(self._start_btn)
+        row2.addWidget(self._start_btn)
         
         self._stop_btn = QPushButton()
         self._stop_btn.setEnabled(False)
+        self._stop_btn.setMinimumWidth(100)
         self._stop_btn.clicked.connect(self._on_stop)
-        settings.addWidget(self._stop_btn)
+        row2.addWidget(self._stop_btn)
         
-        self._layout.addLayout(settings)
+        settings_layout.addLayout(row2)
+        self._layout.addLayout(settings_layout)
         
         # Warning label for missing tools (hidden by default)
         self._warning_label = QLabel()
@@ -139,11 +167,13 @@ class ChatPage(BasePage):
         
         self._log_display = QTextEdit()
         self._log_display.setReadOnly(True)
-        self._log_display.setMaximumHeight(100)
+        self._log_display.setMinimumHeight(120)
         log_layout.addWidget(self._log_display)
         splitter.addWidget(log_widget)
         
-        splitter.setSizes([300, 100])
+        # Default split: 70% conversation, 30% logs
+        splitter.setStretchFactor(0, 7)
+        splitter.setStretchFactor(1, 3)
         self._layout.addWidget(splitter, 1)
         
         # Manual send section
@@ -180,6 +210,7 @@ class ChatPage(BasePage):
         self._max_wait_label.setText(tr("chat.max_wait"))
         self._start_btn.setText(tr("chat.start"))
         self._stop_btn.setText(tr("chat.stop"))
+        self._strict_mode_check.setText(tr("chat.strict_mode"))
         self._conv_label.setText(tr("chat.conversation"))
         self._log_label.setText(tr("chat.log"))
         self._manual_label.setText(tr("manual.title"))
@@ -190,6 +221,10 @@ class ChatPage(BasePage):
         if mw._selected_window:
             self._target_label.setText(f"Target: {mw._selected_window.title[:30]}")
     
+    def _on_kb_selection_changed(self, selected_kbs: list[str]) -> None:
+        """Handle KB selection change."""
+        self._selected_kbs = selected_kbs
+
     def on_enter(self) -> None:
         """Update target label when entering page."""
         mw = self.main_window
@@ -198,6 +233,30 @@ class ChatPage(BasePage):
         
         can_start = mw._llm_client is not None and mw._selected_window is not None
         self._start_btn.setEnabled(can_start)
+        
+        # Populate KB selector from KB page config
+        kb_config = mw._kb_config
+        if self._kb_selector is not None and kb_config and kb_config.get("enabled"):
+            self._strict_mode_check.setVisible(True)
+            if kb_config.get("strict_mode"):
+                self._strict_mode_check.setChecked(True)
+            try:
+                from liao.knowledge.kb_config import KBConfig
+                from liao.knowledge.kb_manager import KBManager
+
+                cfg = KBConfig(
+                    chroma_dir=kb_config.get("chroma_dir", ""),
+                    embedding_model=kb_config.get("embedding_model", "nomic-embed-text"),
+                    ollama_url=kb_config.get("ollama_url", "http://localhost:11434"),
+                )
+                mgr = KBManager(cfg)
+                kbs = mgr.list_kbs()
+                if kbs:
+                    self._kb_selector.set_available_kbs(kbs)
+            except Exception:
+                pass
+        else:
+            self._strict_mode_check.setVisible(False)
         
         # Show warnings for missing tools on Linux
         warnings = []
@@ -245,6 +304,9 @@ class ChatPage(BasePage):
             manual_chat_rect=mw._manual_chat_rect,
             manual_input_rect=mw._manual_input_rect,
             manual_send_btn_pos=mw._manual_send_btn_pos,
+            kb_config=mw._kb_config,
+            selected_kbs=getattr(self, '_selected_kbs', None),
+            strict_mode=self._strict_mode_check.isChecked(),
         )
         
         worker = mw._auto_worker
@@ -255,6 +317,7 @@ class ChatPage(BasePage):
         worker.status_update.connect(lambda m: self._log(f"[Status] {m}"))
         worker.error_occurred.connect(lambda m: self._log(f"[Error] {m}"))
         worker.round_completed.connect(lambda n: self._log(f"--- Round {n} completed ---"))
+        worker.kb_status.connect(lambda m: self._log(f"[KB] {m}"))
         worker.conversation_log.connect(self._on_conv_log)
         worker.finished.connect(self._on_finished)
         

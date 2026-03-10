@@ -1,4 +1,4 @@
-"""Agent workflow orchestration."""
+"""Agent workflow orchestration with knowledge base support."""
 
 from __future__ import annotations
 
@@ -58,6 +58,9 @@ class AgentWorkflow:
         manual_chat_rect: tuple[int, int, int, int] | None = None,
         manual_input_rect: tuple[int, int, int, int] | None = None,
         manual_send_btn_pos: tuple[int, int] | None = None,
+        kb_config: dict | None = None,
+        selected_kbs: list[str] | None = None,
+        strict_mode: bool = False,
     ):
         self._client = llm_client
         self._wm = window_manager
@@ -76,6 +79,34 @@ class AgentWorkflow:
         self._input_sim = InputSimulator()
         self._history: list[dict] = []
         
+        # KB state
+        self._kb_enabled = False
+        self._kb_manager = None
+        self._kb_collections: list[str] | None = None
+        self._strict_mode = strict_mode
+        self._kb_source_lang: str | None = None
+
+        if kb_config and kb_config.get("enabled"):
+            try:
+                from liao.knowledge.kb_config import KBConfig
+                from liao.knowledge.kb_manager import KBManager
+
+                cfg = KBConfig(
+                    chroma_dir=kb_config.get("chroma_dir", ""),
+                    embedding_model=kb_config.get("embedding_model", "nomic-embed-text"),
+                    ollama_url=kb_config.get("ollama_url", "http://localhost:11434"),
+                )
+                mgr = KBManager(cfg)
+                if mgr.retriever.is_available:
+                    self._kb_manager = mgr
+                    self._kb_collections = selected_kbs if selected_kbs else None
+                    self._kb_enabled = True
+                    logger.info("KB enabled with collections: %s", self._kb_collections or "all")
+                else:
+                    logger.warning("KB configured but ChromaDB not available")
+            except Exception as e:
+                logger.warning(f"Failed to initialize KB: {e}")
+        
         # Callbacks
         self.on_status: Callable[[str], None] | None = None
         self.on_message_generated: Callable[[str], None] | None = None
@@ -85,6 +116,7 @@ class AgentWorkflow:
         self.on_error: Callable[[str], None] | None = None
         self.on_round_complete: Callable[[int], None] | None = None
         self.on_conversation_update: Callable[[str], None] | None = None
+        self.on_kb_status: Callable[[str], None] | None = None
 
     @property
     def memory(self) -> ConversationMemory:
@@ -151,6 +183,10 @@ class AgentWorkflow:
         else:
             self._emit_status("No existing messages found")
 
+        # KB language detection (once per session)
+        if self._kb_enabled and self._kb_manager:
+            self._detect_kb_language()
+
         # Main loop
         round_num = 0
         consecutive_no_reply = 0
@@ -209,11 +245,45 @@ class AgentWorkflow:
             is_first = len(self._memory) == 0
             last_other = self._memory.get_last_other_message()
             previous_self = self._memory.get_recent_self_messages(n=5)
+            
+            # KB retrieval (before generation)
+            kb_context = None
+            if self._kb_enabled and self._kb_manager and last_other:
+                kb_context = self._retrieve_kb_context(last_other, input_rect)
+                if kb_context is None and self._strict_mode:
+                    # Strict mode: refuse and skip generation
+                    from .prompts import KB_STRICT_REFUSAL
+                    self._emit_kb_status("Strict mode: no KB results, sending refusal")
+                    refusal = KB_STRICT_REFUSAL
+                    refreshed = self._wm.refresh_window_info(self._window)
+                    if refreshed:
+                        self._window = refreshed
+                        ix = (input_rect[0] + input_rect[2]) // 2
+                        iy = (input_rect[1] + input_rect[3]) // 2
+                        self._input_sim.click_and_type(
+                            x=ix, y=iy, text=refusal,
+                            hwnd=self._window.hwnd,
+                            win_rect=self._window.rect,
+                            clear_first=True, move_duration=0.4
+                        )
+                        self._send_message(input_rect)
+                        self._memory.add_self_message(refusal)
+                        if self.on_message_generated:
+                            self.on_message_generated(refusal)
+                        if self.on_message_sent:
+                            self.on_message_sent(refusal)
+                        self._update_conversation_display()
+                    if self.on_round_complete:
+                        self.on_round_complete(round_num)
+                    time.sleep(1.5)
+                    continue
+
             user_content = self._prompt_manager.build_chat_context(
                 conversation_context=context,
                 last_other_message=last_other,
                 is_first_message=is_first,
                 previous_self_messages=previous_self,
+                kb_context=kb_context,
             )
             self._history.append({"role": "user", "content": user_content})
 
@@ -274,6 +344,84 @@ class AgentWorkflow:
 
         self._emit_status(f"Completed {round_num}/{self._rounds} rounds")
         self._running = False
+
+    def _emit_kb_status(self, msg: str) -> None:
+        if self.on_kb_status:
+            self.on_kb_status(msg)
+
+    def _detect_kb_language(self) -> None:
+        """Detect KB source language by sampling documents."""
+        try:
+            from .kb_helpers import sample_kb_documents, detect_language
+
+            self._emit_kb_status("Detecting KB language...")
+            sample = sample_kb_documents(self._kb_manager, self._kb_collections)
+            if sample:
+                self._kb_source_lang = detect_language(self._client, sample)
+                self._emit_kb_status(f"KB language: {self._kb_source_lang}")
+            else:
+                self._kb_source_lang = None
+                self._emit_kb_status("No KB documents found for language detection")
+        except Exception as e:
+            logger.warning(f"KB language detection failed: {e}")
+            self._kb_source_lang = None
+
+    def _retrieve_kb_context(
+        self, last_other: str, input_rect: tuple[int, int, int, int]
+    ) -> str | None:
+        """Retrieve KB context for the current conversation turn.
+
+        Handles cross-lingual translation if KB language differs from
+        conversation language.
+
+        Returns:
+            KB context string to inject into prompt, or None if no results.
+        """
+        from .kb_helpers import detect_language, translate_text, languages_differ
+
+        self._emit_kb_status("Searching knowledge base...")
+
+        try:
+            query = last_other
+
+            # Cross-lingual: detect conversation language and translate query if needed
+            cross_lingual = False
+            conv_lang = None
+            if self._kb_source_lang:
+                conv_lang = detect_language(self._client, last_other)
+                if languages_differ(conv_lang, self._kb_source_lang):
+                    cross_lingual = True
+                    self._emit_kb_status(
+                        f"Cross-lingual: {conv_lang} -> {self._kb_source_lang}"
+                    )
+                    query = translate_text(
+                        self._client, last_other, conv_lang, self._kb_source_lang
+                    )
+
+            # Search KB
+            context_str, sources = self._kb_manager.search_and_synthesize(
+                query, self._kb_collections, max_chars=4000
+            )
+
+            if not context_str:
+                self._emit_kb_status("No relevant KB content found")
+                return None
+
+            self._emit_kb_status(f"Found {len(sources)} KB sources")
+
+            # Translate results back to conversation language if cross-lingual
+            if cross_lingual and conv_lang:
+                self._emit_kb_status("Translating KB results...")
+                context_str = translate_text(
+                    self._client, context_str, self._kb_source_lang, conv_lang
+                )
+
+            return context_str
+
+        except Exception as e:
+            logger.warning(f"KB retrieval failed: {e}")
+            self._emit_kb_status(f"KB retrieval error: {e}")
+            return None
 
     def _detect_areas(self) -> AreaDetectionResult | None:
         """Detect or use manual areas."""

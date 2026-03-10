@@ -53,16 +53,17 @@ class ConnectionPage(BasePage):
         self._subtitle = QLabel()
         content_layout.addWidget(self._subtitle)
         
-        # Form layout
+        # Form layout with better spacing
         form = QFormLayout()
-        form.setSpacing(12)
+        form.setSpacing(15)
         form.setLabelAlignment(Qt.AlignRight)
+        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         
         # URL row: QLineEdit + Connect button inline
         url_row = QWidget()
         url_row_layout = QHBoxLayout(url_row)
         url_row_layout.setContentsMargins(0, 0, 0, 0)
-        url_row_layout.setSpacing(6)
+        url_row_layout.setSpacing(8)
         
         self._url_edit = QLineEdit("http://localhost:11434")
         self._url_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
