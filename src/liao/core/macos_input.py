@@ -7,7 +7,7 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..models.window import WindowInfo
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +117,6 @@ class MacOSInputSimulator:
                 CGEventKeyboardSetUnicodeString,
                 CGEventPost,
                 kCGHIDEventTap,
-                kCGKeyDown,
-                kCGKeyUp,
             )
 
             for char in text:

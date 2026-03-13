@@ -17,9 +17,9 @@ if TYPE_CHECKING:
 
 class AutoChatWorker(QThread):
     """Worker thread for the auto-conversation loop.
-    
+
     Runs AgentWorkflow in a background thread to avoid blocking the UI.
-    
+
     Signals:
         message_generated: Emitted when a message is generated (str)
         message_sent: Emitted when a message is sent (str)
@@ -53,7 +53,7 @@ class AutoChatWorker(QThread):
         window_info: "WindowInfo",
         prompt: str,
         rounds: int = 10,
-        max_wait_seconds: float = 60.0,
+        max_wait_seconds: float = 10.0,
         poll_interval: float = 3.0,
         manual_chat_rect: tuple[int, int, int, int] | None = None,
         manual_input_rect: tuple[int, int, int, int] | None = None,
@@ -102,7 +102,7 @@ class AutoChatWorker(QThread):
             selected_kbs=self._selected_kbs,
             strict_mode=self._strict_mode,
         )
-        
+
         # Connect callbacks to signals
         self._workflow.on_status = lambda m: self.status_update.emit(m)
         self._workflow.on_message_generated = lambda m: self.message_generated.emit(m)
@@ -113,7 +113,7 @@ class AutoChatWorker(QThread):
         self._workflow.on_round_complete = lambda n: self.round_completed.emit(n)
         self._workflow.on_conversation_update = lambda h: self.conversation_log.emit(h)
         self._workflow.on_kb_status = lambda m: self.kb_status.emit(m)
-        
+
         # Run workflow
         try:
             self._workflow.run()

@@ -5,16 +5,14 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtCore import Signal, QThread
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
-    QListView,
     QListWidget,
-    QListWidgetItem,
     QPushButton,
     QProgressBar,
     QSpinBox,

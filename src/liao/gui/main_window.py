@@ -6,7 +6,7 @@ import logging
 import sys
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt, Slot, QTimer
+from PySide6.QtCore import Slot, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QHBoxLayout,

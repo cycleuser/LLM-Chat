@@ -4,11 +4,7 @@ from __future__ import annotations
 
 import io
 import logging
-import os
-import shutil
-import subprocess
 import sys
-import tempfile
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -36,6 +32,7 @@ class ScreenshotReader:
         self._ocr_reader = None
         self._ocr_type: str | None = None
         self._macos_screenshot = None
+        print(f"ScreenshotReader 初始化 - macOS: {IS_MACOS}")
         self._load_deps()
 
     def _load_deps(self):
@@ -148,16 +145,17 @@ class ScreenshotReader:
     def capture_region(
         self, window_info: WindowInfo, region_rect: tuple[int, int, int, int]
     ) -> Image | None:
-        """Capture specific region.
+        """Capture specific region (screen coordinates).
 
         Args:
-            window_info: Window reference
+            window_info: Window reference (unused, for API compatibility)
             region_rect: (left, top, right, bottom) in screen coords
 
         Returns:
             PIL Image or None
         """
         if not self.is_available():
+            logger.error("Screenshot not available")
             return None
 
         try:
@@ -165,12 +163,20 @@ class ScreenshotReader:
             width = right - left
             height = bottom - top
 
+            if width <= 0 or height <= 0:
+                logger.error(f"Invalid region dimensions: {width}x{height}")
+                return None
+
+            logger.debug(f"Capturing region: ({left}, {top}) {width}x{height}")
+            print(f"    截图区域: ({left}, {top}) 到 ({right}, {bottom}), 尺寸 {width}x{height}")
+
             if IS_MACOS and self._macos_screenshot:
                 return self._macos_screenshot.capture_region(left, top, width, height)
             elif self._pyautogui:
                 return self._pyautogui.screenshot(region=(left, top, width, height))
         except Exception as e:
             logger.error(f"Region capture failed: {e}")
+            print(f"    ❌ 截图失败: {e}")
 
         return None
 

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 @dataclass
 class ToolResult:
     """Standardised return type for all Liao API functions."""
+
     success: bool
     data: Any = None
     error: Optional[str] = None
@@ -73,7 +74,7 @@ class VisionAgent:
         target_window: "WindowInfo",
         prompt: str = "",
         max_rounds: int = 10,
-        max_wait_seconds: float = 60.0,
+        max_wait_seconds: float = 10.0,
         poll_interval: float = 3.0,
         chat_area: tuple[int, int, int, int] | None = None,
         input_area: tuple[int, int, int, int] | None = None,
@@ -227,7 +228,7 @@ def run_automation(
     provider: str = "ollama",
     model: str = "",
     base_url: str = "http://localhost:11434",
-    max_wait: float = 60.0,
+    max_wait: float = 10.0,
     poll_interval: float = 3.0,
 ) -> ToolResult:
     """Run headless GUI automation on a target window.

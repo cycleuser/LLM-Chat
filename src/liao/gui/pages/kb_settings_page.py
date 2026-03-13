@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
 from ..i18n import tr
 
 if TYPE_CHECKING:
-    from ..main_window import MainWindow
+    pass
 
 logger = logging.getLogger(__name__)
 

@@ -13,21 +13,14 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import shutil
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from .models import (
-    OpenCodeEvent,
-    OpenCodeMessage,
-    OpenCodeProject,
     OpenCodeSession,
     OpenCodeStatus,
-    OpenCodeTodo,
-    SessionStatus,
 )
 
 logger = logging.getLogger(__name__)

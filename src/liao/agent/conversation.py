@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -24,19 +23,19 @@ def _get_conversations_dir() -> Path:
 
 class ConversationMemory:
     """Structured conversation memory with sender attribution.
-    
+
     Maintains a history of chat messages with proper sender tracking
     and formatting utilities for LLM consumption and display.
     Supports persistence to markdown files.
-    
+
     Example:
         memory = ConversationMemory(contact_name="Alice")
         memory.add_other_message("Hello!")
         memory.add_self_message("Hi there!")
-        
+
         # Format for LLM
         context = memory.format_for_llm()
-        
+
         # Save to file
         memory.save_to_file()
     """
@@ -70,55 +69,59 @@ class ConversationMemory:
 
     def add_self_message(self, content: str, msg_type: str = "text") -> None:
         """Add a message from self.
-        
+
         Args:
             content: Message content
             msg_type: Message type (text, image, etc.)
         """
-        self._messages.append(ChatMessage(
-            sender="self",
-            content=content,
-            msg_type=msg_type,
-        ))
+        self._messages.append(
+            ChatMessage(
+                sender="self",
+                content=content,
+                msg_type=msg_type,
+            )
+        )
         self._sent_messages.add(self._normalize_for_comparison(content))
         self._auto_save()
 
     def add_other_message(self, content: str, msg_type: str = "text") -> None:
         """Add a message from the other party.
-        
+
         Args:
             content: Message content
             msg_type: Message type (text, image, etc.)
         """
-        self._messages.append(ChatMessage(
-            sender="other",
-            content=content,
-            msg_type=msg_type,
-        ))
+        self._messages.append(
+            ChatMessage(
+                sender="other",
+                content=content,
+                msg_type=msg_type,
+            )
+        )
         self._auto_save()
 
     def _normalize_for_comparison(self, text: str) -> str:
         """Normalize text for similarity comparison."""
         # Remove punctuation, lowercase, remove extra spaces
-        text = re.sub(r'[^\w\s]', '', text.lower())
-        return ' '.join(text.split())
+        text = re.sub(r"[^\w\s]", "", text.lower())
+        return " ".join(text.split())
 
     def is_duplicate_or_similar(self, content: str, threshold: float = 0.7) -> bool:
         """Check if content is too similar to previous self messages.
-        
+
         Args:
             content: Message to check
             threshold: Similarity threshold (0-1)
-            
+
         Returns:
             True if content is duplicate or too similar
         """
         normalized = self._normalize_for_comparison(content)
-        
+
         # Exact match
         if normalized in self._sent_messages:
             return True
-        
+
         # Check similarity with recent self messages (last 10)
         recent_self = [m.content for m in self._messages[-20:] if m.sender == "self"]
         for prev in recent_self:
@@ -139,10 +142,10 @@ class ConversationMemory:
 
     def get_recent_self_messages(self, n: int = 5) -> list[str]:
         """Get the n most recent self messages for context.
-        
+
         Args:
             n: Number of messages to return
-            
+
         Returns:
             List of message contents
         """
@@ -150,10 +153,10 @@ class ConversationMemory:
 
     def format_for_llm(self, max_messages: int = 20) -> str:
         """Format conversation for LLM with highlighted latest exchange.
-        
+
         Args:
             max_messages: Maximum number of recent messages to include
-            
+
         Returns:
             Formatted conversation string
         """
@@ -203,21 +206,21 @@ class ConversationMemory:
 
     def format_for_display_html(self, max_messages: int = 20) -> str:
         """Format conversation as HTML for display.
-        
+
         Args:
             max_messages: Maximum number of recent messages to include
-            
+
         Returns:
             HTML string
         """
         msgs = self._messages[-max_messages:]
         if not msgs:
             return "<p style='color:#999; text-align:center;'>Conversation is empty</p>"
-        
+
         parts = [
             "<html><body style='margin:4px; font-family:Segoe UI,Microsoft YaHei,sans-serif; font-size:13px;'>"
         ]
-        
+
         for m in msgs:
             content = (
                 m.content.replace("&", "&amp;")
@@ -227,7 +230,7 @@ class ConversationMemory:
             )
             if m.msg_type != "text":
                 content = f"[{m.msg_type}]"
-            
+
             if m.sender == "self":
                 parts.append(
                     "<table width='100%' cellpadding='0' cellspacing='0'><tr>"
@@ -244,13 +247,13 @@ class ConversationMemory:
                     f"<span style='background-color:#FFFFFF; color:#000; padding:6px 10px; border-radius:6px; border:1px solid #E0E0E0;'>{content}</span>"
                     "</div></td><td width='25%'></td></tr></table>"
                 )
-        
+
         parts.append("</body></html>")
         return "".join(parts)
 
     def get_last_other_message(self) -> str | None:
         """Get the most recent message from other party.
-        
+
         Returns:
             Message content or None
         """
@@ -261,7 +264,7 @@ class ConversationMemory:
 
     def get_last_self_message(self) -> str | None:
         """Get the most recent message from self.
-        
+
         Returns:
             Message content or None
         """
@@ -272,7 +275,7 @@ class ConversationMemory:
 
     def is_last_message_from_self(self) -> bool:
         """Check if the last message was from self.
-        
+
         Returns:
             True if last message is from self
         """
@@ -290,7 +293,7 @@ class ConversationMemory:
         """Get the file path for this conversation."""
         if self._file_path is None:
             conv_dir = _get_conversations_dir()
-            safe_name = re.sub(r'[^\w\-]', '_', self._contact_name)[:20]
+            safe_name = re.sub(r"[^\w\-]", "_", self._contact_name)[:20]
             filename = f"{self._session_id}_{safe_name}.md"
             self._file_path = conv_dir / filename
         return self._file_path
@@ -304,23 +307,23 @@ class ConversationMemory:
 
     def save_to_file(self) -> Path:
         """Save conversation to markdown file.
-        
+
         Returns:
             Path to the saved file
         """
         path = self._get_file_path()
-        
+
         lines = [
             f"# Conversation with {self._contact_name}",
-            f"",
+            "",
             f"**Session**: {self._session_id}",
             f"**Started**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"**Messages**: {len(self._messages)}",
-            f"",
+            "",
             "---",
             "",
         ]
-        
+
         for m in self._messages:
             sender = "**Me**" if m.sender == "self" else f"**{self._contact_name}**"
             content = m.content.replace("\n", "\n> ")
@@ -329,32 +332,32 @@ class ConversationMemory:
             lines.append(f"{sender}:")
             lines.append(f"> {content}")
             lines.append("")
-        
+
         path.write_text("\n".join(lines), encoding="utf-8")
         return path
 
     def load_from_file(self, path: Path | str) -> bool:
         """Load conversation from markdown file.
-        
+
         Args:
             path: Path to the markdown file
-            
+
         Returns:
             True if loaded successfully
         """
         path = Path(path)
         if not path.exists():
             return False
-        
+
         try:
             content = path.read_text(encoding="utf-8")
             self._messages.clear()
             self._sent_messages.clear()
-            
+
             # Parse markdown format
             current_sender = None
             current_content = []
-            
+
             for line in content.split("\n"):
                 if line.startswith("**Me**:"):
                     if current_sender and current_content:
@@ -378,7 +381,7 @@ class ConversationMemory:
                     current_content = []
                 elif line.startswith("> ") and current_sender:
                     current_content.append(line[2:])
-            
+
             # Handle last message
             if current_sender and current_content:
                 msg = "\n".join(current_content).strip()
@@ -387,7 +390,7 @@ class ConversationMemory:
                     self._sent_messages.add(self._normalize_for_comparison(msg))
                 else:
                     self._messages.append(ChatMessage(sender="other", content=msg))
-            
+
             self._file_path = path
             return True
         except Exception:
@@ -396,7 +399,7 @@ class ConversationMemory:
     @staticmethod
     def list_saved_conversations() -> list[Path]:
         """List all saved conversation files.
-        
+
         Returns:
             List of conversation file paths, newest first
         """

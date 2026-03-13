@@ -12,7 +12,6 @@ from .area_detector import ChatAreaDetector
 from .input_simulator import InputSimulator
 from .screenshot import ScreenshotReader
 from .send_mode import SendModeManager, SendShortcut, SendConfig
-from ..models.detection import AreaDetectionResult
 from ..models.message import ChatMessage
 from ..agent.chat_parser import OCRChatParser
 
@@ -131,7 +130,7 @@ class SmartAutomationManager:
         input_rect = config.input_area
         ix, iy = (input_rect[0] + input_rect[2]) // 2, (input_rect[1] + input_rect[3]) // 2
 
-        self._emit_status(f"Typing message...")
+        self._emit_status("Typing message...")
         self._input.click_and_type(x=ix, y=iy, text=text, hwnd=window_info.hwnd,
                                    win_rect=window_info.rect, clear_first=True, move_duration=0.3)
         time.sleep(0.15)
@@ -147,7 +146,7 @@ class SmartAutomationManager:
 
         if send_config.shortcut == SendShortcut.BUTTON and config.send_button_pos:
             bx, by = config.send_button_pos
-            self._emit_status(f"Clicking send button...")
+            self._emit_status("Clicking send button...")
             self._input.click_in_window(hwnd=hwnd, win_left=window_info.rect[0],
                                         win_top=window_info.rect[1], screen_x=bx, screen_y=by)
             time.sleep(0.1)
@@ -189,13 +188,13 @@ class SmartAutomationManager:
                 ocr_text = self._reader.extract_text(chat_crop)
                 if expected_text in ocr_text:
                     self._send_manager.record_success(app_type)
-                    self._emit_status(f"✓ Send verified (OCR)")
+                    self._emit_status("✓ Send verified (OCR)")
                     if self.on_send_result:
                         self.on_send_result(True, "Message verified via OCR")
                     return True
 
         self._send_manager.record_failure(app_type)
-        self._emit_status(f"✗ Send verification failed")
+        self._emit_status("✗ Send verification failed")
         if self.on_send_result:
             self.on_send_result(False, "Could not verify")
         

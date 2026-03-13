@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    from PIL.Image import Image
     from ..models.window import WindowInfo
 
 from .screenshot import ScreenshotReader
@@ -105,7 +104,7 @@ class ChatAutomation:
 
         self._config = config
 
-        self._emit(f"检测完成:")
+        self._emit("检测完成:")
         self._emit(f"  对话区域: {config.chat_area}")
         self._emit(f"  输入区域: {config.input_area}")
         self._emit(f"  发送按钮: {config.send_button}")

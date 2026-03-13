@@ -65,6 +65,7 @@
         "select_input": "选择输入区域",
         "select_send": "标记发送按钮",
         "clear": "清除",
+        "test_send": "测试发送",
         "preview": "截图预览",
         "info": "检测信息将显示在这里",
         "warning_no_ocr": "未找到OCR引擎，自动检测将仅使用启发式方法。\n安装: pip install easyocr",

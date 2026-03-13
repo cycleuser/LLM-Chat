@@ -19,10 +19,9 @@ from PySide6.QtWidgets import (
 )
 
 from ..i18n import tr
-from ...core.chat_automation import ChatAutomation
+from ...core.chat_input import ChatInput
 from ...core.area_detector import ChatAreaDetector
 from ...core.smart_automation import SmartAutomationManager
-from ...core.send_mode import DEFAULT_SEND_CONFIGS
 from ...models.detection import AreaDetectionResult
 from .base_page import BasePage
 
@@ -39,7 +38,7 @@ class AreaPage(BasePage):
 
     def __init__(self, main_window: MainWindow, parent: QWidget | None = None):
         self._smart_manager: SmartAutomationManager | None = None
-        self._chat_automation: ChatAutomation | None = None
+        self._chat_input: ChatInput | None = None
         super().__init__(main_window, parent)
 
     def _build_ui(self) -> None:
@@ -157,6 +156,8 @@ class AreaPage(BasePage):
         else:
             self._app_info_label.setText(tr("area.no_window"))
 
+        self._test_btn.setText(tr("area.test_send"))
+
     def is_valid(self) -> bool:
         """Area page is always valid (areas are optional)."""
         return True
@@ -177,6 +178,7 @@ class AreaPage(BasePage):
 
         self._status_label.setText(tr("area.detecting"))
         self._status_label.setStyleSheet("color: blue;")
+        QApplication.processEvents()
 
         mw._selected_window = mw._window_manager.refresh_window_info(mw._selected_window)
         if not mw._selected_window:
@@ -184,24 +186,19 @@ class AreaPage(BasePage):
             self._status_label.setStyleSheet("color: red;")
             return
 
-        if not self._smart_manager:
-            self._smart_manager = SmartAutomationManager(mw._screenshot_reader)
+        if not self._chat_input:
+            self._chat_input = ChatInput()
 
-        def on_status(msg: str):
-            self._status_label.setText(msg)
+        areas = self._chat_input.detect_areas(mw._selected_window)
 
-        self._smart_manager.on_status = on_status
-        config = self._smart_manager.auto_detect(mw._selected_window)
-
-        if config:
+        if areas:
             mw._detected_areas = AreaDetectionResult(
-                chat_area_rect=config.chat_area,
-                input_area_rect=config.input_area,
-                method=config.detection_method,
-                confidence=config.confidence,
+                chat_area_rect=areas.chat_rect,
+                input_area_rect=areas.input_rect,
+                method=areas.method,
+                confidence=areas.confidence,
             )
-            if config.send_button_pos:
-                mw._manual_send_btn_pos = config.send_button_pos
+            mw._manual_send_btn_pos = areas.send_button
 
             ss = mw._screenshot_reader.capture_window(mw._selected_window)
             if ss:
@@ -210,16 +207,13 @@ class AreaPage(BasePage):
                     mw._detected_areas,
                 )
 
-            # Show detailed status with send mode
-            send_info = self._smart_manager.get_send_info()
-            status_text = self._smart_manager.get_status_text()
-            if send_info.get("configured"):
-                self._status_label.setText(
-                    f"{status_text}\n"
-                    f"Send: {send_info['send_mode']} | New line: {send_info['new_line_mode']}"
-                )
-            else:
-                self._status_label.setText(status_text)
+            method_display = "OCR" if areas.method == "ocr" else "启发式"
+            self._status_label.setText(
+                f"检测完成 ({method_display}, {areas.confidence:.0%})\n"
+                f"对话区域: {areas.chat_rect}\n"
+                f"输入区域: {areas.input_rect}\n"
+                f"发送按钮: {areas.send_button}"
+            )
             self._status_label.setStyleSheet("color: green;")
             self._clear_btn.setVisible(True)
             self._test_btn.setVisible(True)
@@ -351,8 +345,8 @@ class AreaPage(BasePage):
         def draw_rect(rect, color, label):
             if not rect:
                 return
-            l, t, r, b = rect
-            l = int((l - win_left) * scale_x)
+            left, t, r, b = rect
+            left = int((left - win_left) * scale_x)
             t = int((t - win_top) * scale_y)
             r = int((r - win_left) * scale_x)
             b = int((b - win_top) * scale_y)
@@ -360,13 +354,13 @@ class AreaPage(BasePage):
             pen = QPen(color, 2)
             painter.setPen(pen)
             painter.setBrush(Qt.NoBrush)
-            painter.drawRect(l, t, r - l, b - t)
+            painter.drawRect(left, t, r - left, b - t)
 
             painter.setBrush(color)
             painter.setPen(Qt.NoPen)
-            painter.drawRect(l, t - 18, len(label) * 8 + 10, 18)
+            painter.drawRect(left, t - 18, len(label) * 8 + 10, 18)
             painter.setPen(Qt.white)
-            painter.drawText(l + 5, t - 4, label)
+            painter.drawText(left + 5, t - 4, label)
 
         draw_rect(areas.chat_area_rect, QColor(Qt.green), "Chat")
         draw_rect(areas.input_area_rect, QColor(Qt.blue), "Input")
@@ -406,27 +400,24 @@ class AreaPage(BasePage):
             QMessageBox.warning(self, tr("dialog.warning_title"), tr("area.select_window_first"))
             return
 
-        if not self._chat_automation:
-            self._chat_automation = ChatAutomation()
+        if not self._chat_input:
+            self._chat_input = ChatInput()
 
-        def on_status(msg: str):
-            self._status_label.setText(msg)
-            QApplication.processEvents()
+        # 检测区域
+        self._status_label.setText("检测区域...")
+        QApplication.processEvents()
 
-        self._chat_automation.on_status = on_status
+        areas = self._chat_input.detect_areas(mw._selected_window)
 
-        # 检测配置
-        config = self._chat_automation.detect(mw._selected_window)
-        if not config:
-            self._status_label.setText("检测失败")
-            return
+        self._status_label.setText(f"输入区域: {areas.input_rect}")
+        QApplication.processEvents()
 
         # 发送测试消息
         test_msg = "【测试消息】"
-        self._status_label.setText(f"发送测试消息: {test_msg}")
+        self._status_label.setText(f"发送: {test_msg}")
         QApplication.processEvents()
 
-        success = self._chat_automation.send_message(test_msg, mw._selected_window, config)
+        success = self._chat_input.send_message(test_msg, mw._selected_window, method="enter")
 
         if success:
             self._status_label.setText("✅ 发送成功!")

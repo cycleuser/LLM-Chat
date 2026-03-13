@@ -65,6 +65,7 @@
         "select_input": "Select Input Area",
         "select_send": "Mark Send Button",
         "clear": "Clear",
+        "test_send": "Test Send",
         "preview": "Screenshot Preview",
         "info": "Detection info will appear here",
         "warning_no_ocr": "No OCR engine. Auto detect uses heuristics only.\nInstall: pip install easyocr",

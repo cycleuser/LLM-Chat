@@ -16,7 +16,6 @@ the permission is explicitly revoked.
 
 from __future__ import annotations
 
-import io
 import logging
 import os
 import random
@@ -359,7 +358,7 @@ class WaylandScreenCapturer:
             try:
                 import gi
                 gi.require_version("Gio", "2.0")
-                from gi.repository import Gio, GLib
+                from gi.repository import Gio
                 self._bus.call_sync(
                     "org.freedesktop.portal.Desktop",
                     self._session_handle,
